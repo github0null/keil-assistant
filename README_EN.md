@@ -31,7 +31,7 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 1. Install C/C++ extension
 > 
 2. Go to the plug-in Settings and set the absolute path to the keil executable, otherwise features such as compilation will not be available
-![preview](./res/preview/setting.png)
+![setting](./res/preview/setting.png)
 
 ***
 
@@ -40,10 +40,10 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 1. Create a project on Keil, add files, header paths, etc
 > 
 2. Open the directory where the project file (.uvproj) resides by vscode，and keil-assistant will Load keil project automatically;
-![preview](./res/preview/load.png)
+![load](./res/preview/load.png)
 > 
 3. Click on the source file to start your code editing，Click build/rebuild Button to complete the compile/recompile of the project
-![preview](./res/preview/rebuild.png)
+![rebuild](./res/preview/rebuild.png)
 ***
 
 ## Work feature

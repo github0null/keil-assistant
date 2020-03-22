@@ -33,7 +33,7 @@ vscode 上的 Keil 辅助工具，为 Keil 项目提供 `语法高亮`、`代码
 1. 安装 C/C++ 插件
 > 
 2. 进入插件设置，设置好 keil 可执行文件的绝对路径，否则编译等功能将无法使用
-![preview](./res/preview/setting.png)
+![setting](./res/preview/setting.png)
 
 ***
 
@@ -42,10 +42,10 @@ vscode 上的 Keil 辅助工具，为 Keil 项目提供 `语法高亮`、`代码
 1. 在 Keil 上创建好项目，添加好文件，头文件路径等
 > 
 2. 使用 vscode 直接打开 keil 项目文件(.uvproj) 所在的目录，keil-assistant 会自动完成加载 keil 项目；
-![preview](./res/preview/load.png)
+![load](./res/preview/load.png)
 > 
 3. 点击源文件开始你的代码编辑，点击 build/rebuild 按钮完成项目的编译/重新编译
-![preview](./res/preview/rebuild.png)
+![rebuild](./res/preview/rebuild.png)
 ***
 
 ## 工作特性

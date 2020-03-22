@@ -2,11 +2,12 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import * as xml2js from 'xml2js';
 import * as event from 'events';
+import * as fs from 'fs';
+import * as node_path from 'path';
 
 import { File } from '../lib/node-utility/File';
 import { ResourceManager } from './ResourceManager';
 import { FileWatcher } from '../lib/node-utility/FileWatcher';
-import * as fs from 'fs';
 import { Time } from '../lib/node-utility/Time';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -290,7 +291,7 @@ abstract class Project implements IView {
 		if (sysIncludes) {
 			incList = incList.concat(sysIncludes);
 		}
-		
+
 		incList.forEach((path) => {
 			if (path.trim() !== '') {
 				this.includes.add(this.toAbsolutePath(path));
@@ -301,7 +302,7 @@ abstract class Project implements IView {
 		this.defines.clear();
 		defineListStr.split(/,|\s+/).forEach((define) => {
 			if (define.trim() !== '') {
-				this.defines.add(define.replace(/=/, ' '));
+				this.defines.add(define);
 			}
 		});
 
@@ -450,7 +451,7 @@ abstract class Project implements IView {
 	protected abstract getDownloadCommand(): string[];
 }
 
-//=========================================
+//===============================================
 
 class C51project extends Project {
 
@@ -458,7 +459,7 @@ class C51project extends Project {
 		const exeFile = new File(ResourceManager.getInstance().getC51UV4Path());
 		if (exeFile.IsFile()) {
 			return [
-				exeFile.dir + File.sep + 'C51' + File.sep + 'INC'
+				node_path.dirname(exeFile.dir) + File.sep + 'C51' + File.sep + 'INC'
 			];
 		}
 		return undefined;
@@ -529,7 +530,7 @@ class ArmProject extends Project {
 		if (exeFile.IsFile()) {
 			let toolName = keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
 			return [
-				exeFile.dir + File.sep + 'ARM' + File.sep + toolName + File.sep + 'include'
+				node_path.dirname(exeFile.dir) + File.sep + 'ARM' + File.sep + toolName + File.sep + 'include'
 			];
 		}
 		return undefined;
@@ -550,7 +551,7 @@ class ArmProject extends Project {
 	}
 
 	protected getProblemMatcher(): string[] {
-		return ['$armcc', '$gcc'];
+		return ['$armcc'];
 	}
 
 	protected getBuildCommand(): string[] {
