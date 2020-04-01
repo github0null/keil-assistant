@@ -2,7 +2,7 @@
 
 [![](https://vsmarketplacebadge.apphb.com/version/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)      [![](https://vsmarketplacebadge.apphb.com/installs/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)     [![](https://vsmarketplacebadge.apphb.com/rating/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)
 
-## Summary
+## Summary 📑
 
 vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlighting`, `code fragment` function, and through the use of `Keil command line function` to `compile`, `download`.
 
@@ -24,9 +24,9 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 
 ***
 
-## Usage
+## Usage 📖
 
-#### Preparatory work
+### Preparatory work
 
 1. Install C/C++ extension
 > 
@@ -35,7 +35,7 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 
 ***
 
-#### Start
+### Start 🏃‍♀️
 
 1. Create a project on Keil, add files, header paths, etc
 > 
@@ -46,13 +46,15 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 ![rebuild](./res/preview/rebuild.png)
 ***
 
-## Work feature
+## Work feature 🎉
 
 * The Keil configuration that the plug-in will read is: file structure, header directory, and macro list
 * Whenever the Keil project file changes, the plug-in automatically updates the view corresponding to vscode, as well as the header file configuration of the C/C++ plug-in
 * Since Keil only writes to the project file when closed, you need to close Keil if you want to refresh to the plug-in after changing the project structure
 * Functions such as compilation are called directly from the keil command line
 
-## Attention
+## Attention 🚩
 
 * **.uvproj** corresponds to Keil C51 project，**.uvprojx** corresponds to Keil MDK project
+
+**If the terminal is using CMD, it may be prompted at compile time that the path is incorrect and PowerShell should be used**
