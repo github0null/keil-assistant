@@ -2,7 +2,7 @@
 	"name": "keil-assistant",
 	"displayName": "Keil Assistant",
 	"description": "An assistant for Keil IDE",
-	"version": "1.1.0",
+	"version": "1.2.1",
 	"preview": true,
 	"publisher": "cl",
 	"author": {
@@ -106,6 +106,20 @@
 					"light": "./res/icons/CopyToClipboard_16x.svg",
 					"dark": "./res/icons/CopyToClipboard_16x.svg"
 				}
+			}
+		],
+		"keybindings": [
+			{
+				"command": "project.build",
+				"key": "f6"
+			},
+			{
+				"command": "project.rebuild",
+				"key": "f7"
+			},
+			{
+				"command": "project.download",
+				"key": "f9"
 			}
 		],
 		"menus": {

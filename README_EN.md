@@ -56,5 +56,3 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 ## Attention 🚩
 
 * **.uvproj** corresponds to Keil C51 project，**.uvprojx** corresponds to Keil MDK project
-
-**If the terminal is using CMD, it may be prompted at compile time that the path is incorrect and PowerShell should be used**

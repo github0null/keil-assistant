@@ -58,5 +58,3 @@ vscode 上的 Keil 辅助工具，为 Keil 项目提供 `语法高亮`、`代码
 ## 注意事项 🚩
 
 * **.uvproj** 对应 Keil C51 项目，**.uvprojx** 对应 Keil MDK 项目
-
-* **如果终端使用的是 CMD, 在编译时可能会提示路径不正确，应该使用 PowerShell**
