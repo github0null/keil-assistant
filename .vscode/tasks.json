@@ -5,16 +5,13 @@
 	"tasks": [
 		{
 			"type": "npm",
-			"script": "compile",
+			"script": "webpack",
 			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
+			"isBackground": false,
 			"presentation": {
 				"reveal": "always"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			}
+            },
+            "group": "build"
 		}
 	]
 }

@@ -1,6 +1,6 @@
 # Keil Assistant
 
-[![](https://vsmarketplacebadge.apphb.com/version/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)      [![](https://vsmarketplacebadge.apphb.com/installs/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)     [![](https://vsmarketplacebadge.apphb.com/rating/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)
+[![](https://vsmarketplacebadge.apphb.com/version/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)      [![](https://vsmarketplacebadge.apphb.com/installs/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)     [![](https://vsmarketplacebadge.apphb.com/downloads/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)     [![](https://vsmarketplacebadge.apphb.com/rating/CL.keil-assistant.svg)](https://marketplace.visualstudio.com/items?itemName=CL.keil-assistant)
 
 ## [English](./README_EN.md)
 
@@ -41,7 +41,7 @@ vscode 上的 Keil 辅助工具，为 Keil 项目提供 `语法高亮`、`代码
 
 1. 在 Keil 上创建好项目，添加好文件，头文件路径等
 > 
-2. 使用 vscode 直接打开 keil 项目文件(.uvproj) 所在的目录，keil-assistant 会自动完成加载 keil 项目；
+2. 点击`打开项目`图标 或者 使用 vscode 直接打开 keil 项目文件(.uvproj) 所在的目录，keil-assistant 会自动完成加载 keil 项目；
 ![load](./res/preview/load.png)
 > 
 3. 点击源文件开始你的代码编辑，点击 build/rebuild 按钮完成项目的编译/重新编译

@@ -32,8 +32,22 @@ export function activate(context: vscode.ExtensionContext) {
             }
         });
 
-        if (uri && uri.length > 0) {
-            await prjExplorer.openProject(uri[0].fsPath);
+        try {
+            if (uri && uri.length > 0) {
+
+                // load project
+                const uvPrjPath = uri[0].fsPath;
+                await prjExplorer.openProject(uvPrjPath);
+
+                // switch workspace
+                const result = await vscode.window.showInformationMessage(
+                    'keil project load done !, switch workspace ?', 'Ok', 'Later');
+                if (result === 'Ok') {
+                    openWorkspace(new File(node_path.dirname(uvPrjPath)));
+                }
+            }
+        } catch (error) {
+            vscode.window.showErrorMessage(`open project failed !, msg: ${(<Error>error).message}`);
         }
     }));
 
@@ -58,12 +72,16 @@ process.on('uncaughtException', (err) => {
     console.error(err);
 });
 
-//===============================================
+//==================== Global Func===========================
 
 function getMD5(data: string): string {
     const md5 = crypto.createHash('md5');
     md5.update(data);
     return md5.digest('hex');
+}
+
+function openWorkspace(wsFile: File) {
+    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.parse(wsFile.ToUri()));
 }
 
 //===============================
@@ -91,7 +109,7 @@ class Source implements IView {
     prjID: string;
     icons?: { light: string; dark: string; } | undefined;
     tooltip?: string | undefined;
-    contextVal?: string | undefined;
+    contextVal?: string | undefined = 'Source';
 
     //---
     readonly file: File;
@@ -101,7 +119,6 @@ class Source implements IView {
         this.file = f;
         this.label = this.file.name;
         this.tooltip = f.path;
-        this.contextVal = Source.name;
         const iName = _enable ? this.getIconBySuffix(f.suffix.toLowerCase()) : 'FileExclude_16x';
         this.icons = {
             dark: iName,
@@ -144,10 +161,10 @@ class FileGroup implements IView {
     label: string;
     prjID: string;
     tooltip?: string | undefined;
-    contextVal?: string | undefined;
+    contextVal?: string | undefined = 'FileGroup';
     icons?: { light: string; dark: string; } = {
-        light: 'CheckboxGroup_16x',
-        dark: 'CheckboxGroup_16x'
+        light: 'Folder_32x',
+        dark: 'Folder_32x'
     };
 
     //----
@@ -158,7 +175,6 @@ class FileGroup implements IView {
         this.prjID = pID;
         this.sources = [];
         this.tooltip = gName;
-        this.contextVal = FileGroup.name;
     }
 
     getChildViews(): IView[] | undefined {
@@ -171,7 +187,7 @@ abstract class Project implements IView {
     prjID: string;
     label: string;
     tooltip?: string | undefined;
-    contextVal?: string | undefined;
+    contextVal?: string | undefined = 'Project';
     icons?: { light: string; dark: string; } = {
         light: 'Class_16x',
         dark: 'Class_16x'
@@ -203,7 +219,6 @@ abstract class Project implements IView {
         this.prjID = getMD5(_uvprjFile.path);
         this.label = _uvprjFile.noSuffixName;
         this.tooltip = _uvprjFile.path;
-        this.contextVal = Project.name;
         this.includes = new Set();
         this.defines = new Set();
         this.fGroups = [];
@@ -222,7 +237,6 @@ abstract class Project implements IView {
         } else {
             prj = new ArmProject(uvprjFile);
         }
-        await prj.init();
         return prj;
     }
 
@@ -359,19 +373,15 @@ abstract class Project implements IView {
     }
 
     async init() {
-        try {
-            await this.reload();
-            this.watcher.Watch();
-            this.watcher.OnChanged = () => {
-                try {
-                    this.reload();
-                } catch (error) {
-                    this.logger.warn(error);
-                }
-            };
-        } catch (error) {
-            this.logger.warn(error);
-        }
+        await this.reload();
+        this.watcher.Watch();
+        this.watcher.OnChanged = () => {
+            try {
+                this.reload();
+            } catch (error) {
+                this.logger.warn(error);
+            }
+        };
     }
 
     private quoteString(str: string, quote: string = '"'): string {
@@ -380,7 +390,6 @@ abstract class Project implements IView {
 
     private runTask(name: string, commands: string[]) {
 
-        const task = new vscode.Task({ type: 'keil-task' }, vscode.TaskScope.Global, name, 'shell');
         const resManager = ResourceManager.getInstance();
         let args: string[] = [];
         const uv4Log = new File(this.vscodeDir.path + File.sep + 'uv4.log');
@@ -397,16 +406,35 @@ abstract class Project implements IView {
         let commandLine = invokePrefix + this.quoteString(resManager.getBuilderExe(), quote) + ' ';
         commandLine += args.map((arg) => { return this.quoteString(arg, quote); }).join(' ');
 
-        task.execution = new vscode.ShellExecution(cmdPrefixSuffix + commandLine + cmdPrefixSuffix);
-        task.isBackground = false;
-        task.problemMatchers = this.getProblemMatcher();
-        task.presentationOptions = {
-            echo: false,
-            focus: false,
-            clear: true
-        };
+        // use task
+        if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
 
-        vscode.tasks.executeTask(task);
+            const task = new vscode.Task({ type: 'keil-task' }, vscode.TaskScope.Global, name, 'shell');
+            task.execution = new vscode.ShellExecution(cmdPrefixSuffix + commandLine + cmdPrefixSuffix);
+            task.isBackground = false;
+            task.problemMatchers = this.getProblemMatcher();
+            task.presentationOptions = {
+                echo: false,
+                focus: false,
+                clear: true
+            };
+            vscode.tasks.executeTask(task);
+
+        } else {
+
+            const index = vscode.window.terminals.findIndex((ter) => {
+                return ter.name === `keil-${name}`;
+            });
+
+            if (index !== -1) {
+                vscode.window.terminals[index].hide();
+                vscode.window.terminals[index].dispose();
+            }
+
+            const terminal = vscode.window.createTerminal(`keil-${name}`);
+            terminal.show();
+            terminal.sendText(commandLine);
+        }
     }
 
     build() {
@@ -572,7 +600,10 @@ class ArmProject extends Project {
             '__weak=',
             '__register=',
             '__pure=',
-            '__value_in_regs='
+            '__value_in_regs=',
+            '__va_start(x)=',
+            '__va_arg(x)=',
+            '__va_end(x)='
         ];
     }
 
@@ -670,14 +701,20 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
             const workspace = new File(vscode.workspace.workspaceFolders[0].uri.fsPath);
             const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER);
             for (const uvFile of uvList) {
-                await this.openProject(uvFile.path);
+                try {
+                    await this.openProject(uvFile.path);
+                } catch (error) {
+                    vscode.window.showErrorMessage(`load project failed !, msg: ${(<Error>error).message}`);
+                }
             }
         }
     }
 
     async openProject(path: string) {
+
         const nPrj = await Project.getInstance(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
+
             nPrj.init();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
@@ -715,10 +752,14 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
 
     private async onItemClick(item: IView) {
         switch (item.contextVal) {
-            case Source.name:
+            case 'Source':
                 const source = <Source>item;
-                const uri = vscode.Uri.parse(source.file.ToUri());
-                vscode.window.showTextDocument(uri);
+                if (source.file.IsFile()) {
+                    const uri = vscode.Uri.parse(source.file.ToUri());
+                    vscode.window.showTextDocument(uri);
+                } else {
+                    vscode.window.showWarningMessage(`Not found file: ${source.file.path}`);
+                }
                 break;
             default:
                 break;

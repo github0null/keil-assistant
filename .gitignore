@@ -5,3 +5,5 @@ out.min
 node_modules
 test
 *.vsix
+dist
+package-lock.json
