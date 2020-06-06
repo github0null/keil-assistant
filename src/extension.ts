@@ -463,11 +463,11 @@ abstract class Project implements IView {
     }
 
     toAbsolutePath(rePath: string): string {
-        let path = rePath.replace(/\//g, '\\');
-        if (path.startsWith('.') || !/^[a-z]:/i.test(path)) {
-            path = this.uvprjFile.dir + File.sep + path;
+        const path = rePath.replace(/\//g, File.sep);
+        if (/^[a-z]:/i.test(path)) {
+            return node_path.normalize(path);
         }
-        return path;
+        return node_path.normalize(this.uvprjFile.dir + File.sep + path);
     }
 
     getChildViews(): IView[] | undefined {

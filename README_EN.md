@@ -15,8 +15,6 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 
 ## Syntax support
 
-* Standard C syntax highlights, code snippets
-* 8051 C syntax highlighting, code snippets
 * 8051 Assembly (A51) syntax highlights, code snippets
 
 ***
@@ -31,7 +29,7 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 
 1. Install C/C++ extension
 > 
-2. Go to the plug-in Settings and set the absolute path to the keil executable, otherwise features such as compilation will not be available
+2. Go to the Keil-Assistant plug-in Settings and set the absolute path to the keil executable, otherwise features such as compilation will not be available
 ![setting](./res/preview/setting.png)
 
 ***
@@ -51,9 +49,9 @@ vscode on the Keil auxiliary tool, for Keil project to provide `syntax highlight
 
 * The Keil configuration that the plug-in will read is: file structure, header directory, and macro list
 * Whenever the Keil project file changes, the plug-in automatically updates the view corresponding to vscode, as well as the header file configuration of the C/C++ plug-in
-* Since Keil only writes to the project file when closed, you need to close Keil if you want to refresh to the plug-in after changing the project structure
 * Functions such as compilation are called directly from the keil command line
 
 ## Attention 🚩
 
 * **.uvproj** corresponds to Keil C51 project，**.uvprojx** corresponds to Keil MDK project
+* Since Keil only writes to the project file when closed, you need to close Keil if you want to refresh to the plug-in View after changing the project structure
