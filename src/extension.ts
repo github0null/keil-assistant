@@ -773,9 +773,9 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
         switch (item.contextVal) {
             case 'Source':
                 const source = <Source>item;
-                if (source.file.IsFile()) {
-                    const uri = vscode.Uri.parse(source.file.ToUri());
-                    vscode.window.showTextDocument(uri);
+                const file = new File(node_path.normalize(source.file.path));
+                if (file.IsFile()) {
+                    vscode.window.showTextDocument(vscode.Uri.parse(file.ToUri()));
                 } else {
                     vscode.window.showWarningMessage(`Not found file: ${source.file.path}`);
                 }
