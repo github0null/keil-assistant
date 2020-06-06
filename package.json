@@ -2,7 +2,7 @@
     "name": "keil-assistant",
     "displayName": "Keil Assistant",
     "description": "An assistant for Keil IDE",
-    "version": "1.3.0",
+    "version": "1.3.1",
     "preview": true,
     "publisher": "cl",
     "author": {
@@ -159,10 +159,6 @@
         },
         "snippets": [
             {
-                "language": "c",
-                "path": "./syntaxes/c51.snippets.json"
-            },
-            {
                 "language": "a51",
                 "path": "./syntaxes/a51.snippets.json"
             }
@@ -183,29 +179,9 @@
                     "**/*.A51"
                 ],
                 "configuration": "./syntaxes/a51.language-configuration.json"
-            },
-            {
-                "id": "c",
-                "aliases": [
-                    "C51"
-                ],
-                "extensions": [
-                    ".c",
-                    ".h"
-                ],
-                "filenamePatterns": [
-                    "**/*.c",
-                    "**/*.h"
-                ],
-                "configuration": "./syntaxes/c51.language-configuration.json"
             }
         ],
         "grammars": [
-            {
-                "language": "c",
-                "scopeName": "source.c.c51",
-                "path": "./syntaxes/c51.tmLanguage.json"
-            },
             {
                 "language": "a51",
                 "scopeName": "source.asm.a51",

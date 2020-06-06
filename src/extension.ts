@@ -494,7 +494,7 @@ class C51project extends Project {
     protected getSysDefines(): string[] {
         return [
             '__C51__',
-            '__KEIL_ASSISTANT__',
+            '__VSCODE_C51__',
             'reentrant=',
             'conpact=',
             'small=',
@@ -509,9 +509,11 @@ class C51project extends Project {
             'sfr=char',
             'sfr16=int',
             'sfr32=int',
-            '_interrupt(x)=',
-            '_using(x)=',
-            '_at(x)='
+            'interrupt=',
+            'using=',
+            '_at_=',
+            '_priority_=',
+            '_task_='
         ];
     }
 
@@ -588,32 +590,49 @@ class ArmProject extends Project {
     protected getSysDefines(): string[] {
         return [
             '__CC_ARM',
-            '__forceinline=',
-            '__inline=',
+            '__arm__',
+            '__align(x)=',
+            '__ALIGNOF__(x)=',
+            '__alignof__(x)=',
             '__asm(x)=',
+            '__forceinline=',
+            '__global_reg(n)=',
+            '__inline=',
+            '__int64=long long',
+            '__INTADDR(expr)=',
+            '__irq=',
+            '__packed=',
+            '__pure=',
+            '__smc(n)=',
+            '__svc(n)=',
+            '__svc_indirect(n)=',
+            '__svc_indirect_r7(n)=',
+            '__value_in_regs=',
+            '__weak=',
+            '__writeonly=',
             '__declspec(x)=',
             '__attribute__(x)=',
             '__nonnull__(x)=',
-            '__int64=int',
-            '__irq=',
-            '__swi=',
-            '__weak=',
             '__register=',
-            '__pure=',
-            '__value_in_regs=',
             '__va_start(x)=',
             '__va_arg(x)=',
-            '__va_end(x)='
+            '__va_end(x)=',
+            '__breakpoint(x)=',
+            '__ror=',
+            '__clz='
         ];
     }
 
     protected getSystemIncludes(keilDoc: any): string[] | undefined {
         const exeFile = new File(ResourceManager.getInstance().getArmUV4Path());
         if (exeFile.IsFile()) {
-            let toolName = keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
-            return [
-                node_path.dirname(exeFile.dir) + File.sep + 'ARM' + File.sep + toolName + File.sep + 'include'
-            ];
+            const toolName = keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
+            const incDir = new File(`${node_path.dirname(exeFile.dir)}${File.sep}ARM${File.sep}${toolName}${File.sep}include`);
+            if (incDir.IsDir()) {
+                return [incDir.path].concat(
+                    incDir.GetList(File.EMPTY_FILTER).map((dir) => { return dir.path; }));
+            }
+            return [incDir.path];
         }
         return undefined;
     }

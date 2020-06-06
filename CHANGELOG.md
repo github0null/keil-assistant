@@ -2,6 +2,12 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.3.1]
+- Fixed: add missed system include path
+- Changed: remove c51 language highlight
+- Optimized: add more system macro
+***
+
 ## [v1.3.0]
 - Add: switch workspace after open project
 - Changed: change icon
