@@ -2,6 +2,11 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.3.2]
+- Fixed: some incorrect C51 keywords
+- Fixed: some other bugs
+***
+
 ## [v1.3.1]
 - Fixed: add missed system include path
 - Changed: remove c51 language highlight

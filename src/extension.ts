@@ -68,10 +68,6 @@ export function deactivate() {
     console.log('---- keil-assistant closed ----');
 }
 
-process.on('uncaughtException', (err) => {
-    console.error(err);
-});
-
 //==================== Global Func===========================
 
 function getMD5(data: string): string {
@@ -307,8 +303,9 @@ abstract class Project implements IView {
         }
 
         incList.forEach((path) => {
-            if (path.trim() !== '') {
-                this.includes.add(this.toAbsolutePath(path));
+            const realPath = path.trim();
+            if (realPath !== '') {
+                this.includes.add(this.toAbsolutePath(realPath));
             }
         });
 
@@ -454,14 +451,6 @@ abstract class Project implements IView {
         this.logger.log('---- project closed ----\r\n');
     }
 
-    toRelativePath(_path: string): string | undefined {
-        let path = _path.replace(/\//g, '\\');
-        if (path.startsWith(this.uvprjFile.dir)) {
-            return path.replace(this.uvprjFile.dir, '.');
-        }
-        return undefined;
-    }
-
     toAbsolutePath(rePath: string): string {
         const path = rePath.replace(/\//g, File.sep);
         if (/^[a-z]:/i.test(path)) {
@@ -496,12 +485,13 @@ class C51project extends Project {
             '__C51__',
             '__VSCODE_C51__',
             'reentrant=',
-            'conpact=',
+            'compact=',
             'small=',
             'large=',
             'data=',
             'idata=',
             'pdata=',
+            'bdata=',
             'xdata=',
             'code=',
             'bit=char',
@@ -626,7 +616,7 @@ class ArmProject extends Project {
     protected getSystemIncludes(keilDoc: any): string[] | undefined {
         const exeFile = new File(ResourceManager.getInstance().getArmUV4Path());
         if (exeFile.IsFile()) {
-            const toolName = keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
+            const toolName = 'ARMCC'; // keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
             const incDir = new File(`${node_path.dirname(exeFile.dir)}${File.sep}ARM${File.sep}${toolName}${File.sep}include`);
             if (incDir.IsDir()) {
                 return [incDir.path].concat(
