@@ -420,7 +420,7 @@ abstract class Project implements IView {
         } else {
 
             const index = vscode.window.terminals.findIndex((ter) => {
-                return ter.name === `keil-${name}`;
+                return ter.name === name;
             });
 
             if (index !== -1) {
@@ -428,7 +428,7 @@ abstract class Project implements IView {
                 vscode.window.terminals[index].dispose();
             }
 
-            const terminal = vscode.window.createTerminal(`keil-${name}`);
+            const terminal = vscode.window.createTerminal(name);
             terminal.show();
             terminal.sendText(commandLine);
         }
@@ -586,6 +586,7 @@ class ArmProject extends Project {
             '__alignof__(x)=',
             '__asm(x)=',
             '__forceinline=',
+            "__restrict=",
             '__global_reg(n)=',
             '__inline=',
             '__int64=long long',
@@ -604,12 +605,33 @@ class ArmProject extends Project {
             '__attribute__(x)=',
             '__nonnull__(x)=',
             '__register=',
-            '__va_start(x)=',
-            '__va_arg(x)=',
-            '__va_end(x)=',
-            '__breakpoint(x)=',
-            '__ror=',
-            '__clz='
+    
+            "__enable_fiq()=",
+            "__disable_fiq()=",
+    
+            "__nop()=",
+            "__wfi()=",
+            "__wfe()=",
+            "__sev()=",
+            
+            "__isb(x)=",
+            "__dsb(x)=",
+            "__dmb(x)=",
+            "__schedule_barrier()=",
+            
+            "__rev(x)=0U",
+    
+            "__ror(x,y)=0U",
+            "__breakpoint(x)=",
+            "__clz(x)=0U",
+            "__ldrex(x)=0U",
+            "__strex(x,y)=0U",
+            "__clrex()=",
+            "__ssat(x,y)=0U",
+            "__usat(x,y)=0U",
+    
+            "__ldrt(x)=0U",
+            "__strt(x,y)="
         ];
     }
 
@@ -707,13 +729,17 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
 
     async loadWorkspace() {
         if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-            const workspace = new File(vscode.workspace.workspaceFolders[0].uri.fsPath);
-            const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER);
-            for (const uvFile of uvList) {
-                try {
-                    await this.openProject(uvFile.path);
-                } catch (error) {
-                    vscode.window.showErrorMessage(`load project failed !, msg: ${(<Error>error).message}`);
+            const wsFilePath: string = vscode.workspace.workspaceFile && /^file:/.test(vscode.workspace.workspaceFile.toString()) ?
+                node_path.dirname(vscode.workspace.workspaceFile.fsPath) : vscode.workspace.workspaceFolders[0].uri.fsPath;
+            const workspace = new File(wsFilePath);
+            if (workspace.IsDir()) {
+                const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER);
+                for (const uvFile of uvList) {
+                    try {
+                        await this.openProject(uvFile.path);
+                    } catch (error) {
+                        vscode.window.showErrorMessage(`load project: '${uvFile.name}' failed !, msg: ${(<Error>error).message}`);
+                    }
                 }
             }
         }
