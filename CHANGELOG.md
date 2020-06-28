@@ -2,6 +2,10 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.3.3]
+- Optimize: extend more armcc keywords
+***
+
 ## [v1.3.2]
 - Fixed: some incorrect C51 keywords
 - Fixed: some other bugs
