@@ -2,8 +2,7 @@
     "name": "keil-assistant",
     "displayName": "Keil Assistant",
     "description": "An assistant for Keil uVision",
-    "version": "1.3.3",
-    "preview": true,
+    "version": "1.4.0",
     "publisher": "cl",
     "author": {
         "name": "cl",
@@ -69,7 +68,7 @@
             },
             {
                 "command": "project.close",
-                "title": "close this keil uVision project",
+                "title": "close project",
                 "icon": {
                     "light": "./res/icons/StatusOffline_16x.svg",
                     "dark": "./res/icons/StatusOffline_16x.svg"
@@ -138,17 +137,17 @@
                 {
                     "command": "project.build",
                     "group": "inline",
-                    "when": "viewItem == Project"
+                    "when": "viewItem == Target"
                 },
                 {
                     "command": "project.rebuild",
                     "group": "inline",
-                    "when": "viewItem == Project"
+                    "when": "viewItem == Target"
                 },
                 {
                     "command": "project.download",
                     "group": "inline",
-                    "when": "viewItem == Project"
+                    "when": "viewItem == Target"
                 },
                 {
                     "command": "item.copyValue",
@@ -226,6 +225,20 @@
                         "location": 2,
                         "severity": 3,
                         "code": 4,
+                        "message": 5
+                    }
+                ]
+            },
+            {
+                "name": "gcc",
+                "fileLocation": "autoDetect",
+                "pattern": [
+                    {
+                        "regexp": "^(.+):(\\d+):(\\d+):\\s+(\\w+):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
                         "message": 5
                     }
                 ]

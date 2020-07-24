@@ -4,11 +4,14 @@ import * as xml2js from 'xml2js';
 import * as event from 'events';
 import * as fs from 'fs';
 import * as node_path from 'path';
+import * as child_process from 'child_process';
 
 import { File } from '../lib/node-utility/File';
 import { ResourceManager } from './ResourceManager';
 import { FileWatcher } from '../lib/node-utility/FileWatcher';
 import { Time } from '../lib/node-utility/Time';
+import { isArray } from 'util';
+import { CmdLineHandler } from './CmdLineHandler';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -27,8 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
             canSelectFolders: false,
             canSelectMany: false,
             filters: {
-                'C51': ['uvproj'],
-                'Keil MDK': ['uvprojx']
+                'keil project xml': ['uvproj', 'uvprojx']
             }
         });
 
@@ -53,11 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
 
     subscriber.push(vscode.commands.registerCommand('project.close', (item: IView) => prjExplorer.closeProject(item.prjID)));
 
-    subscriber.push(vscode.commands.registerCommand('project.build', (item: IView) => prjExplorer.getProject(item)?.build()));
+    subscriber.push(vscode.commands.registerCommand('project.build', (item: IView) => prjExplorer.getTarget(item)?.build()));
 
-    subscriber.push(vscode.commands.registerCommand('project.rebuild', (item: IView) => prjExplorer.getProject(item)?.rebuild()));
+    subscriber.push(vscode.commands.registerCommand('project.rebuild', (item: IView) => prjExplorer.getTarget(item)?.rebuild()));
 
-    subscriber.push(vscode.commands.registerCommand('project.download', (item: IView) => prjExplorer.getProject(item)?.download()));
+    subscriber.push(vscode.commands.registerCommand('project.download', (item: IView) => prjExplorer.getTarget(item)?.download()));
 
     subscriber.push(vscode.commands.registerCommand('item.copyValue', (item: IView) => vscode.env.clipboard.writeText(item.tooltip || '')));
 
@@ -141,6 +143,7 @@ class Source implements IView {
             case '.asm':
                 return 'AssemblerSourceFile_16x';
             case '.lib':
+            case '.a':
                 return 'Library_16x';
             default:
                 return 'Text_16x';
@@ -178,47 +181,55 @@ class FileGroup implements IView {
     }
 }
 
-abstract class Project implements IView {
+interface KeilProjectInfo {
+
+    prjID: string;
+
+    vscodeDir: File;
+
+    uvprjFile: File;
+
+    logger: Console;
+
+    toAbsolutePath(rePath: string): string;
+}
+
+class KeilProject implements IView, KeilProjectInfo {
 
     prjID: string;
     label: string;
     tooltip?: string | undefined;
     contextVal?: string | undefined = 'Project';
     icons?: { light: string; dark: string; } = {
-        light: 'Class_16x',
-        dark: 'Class_16x'
+        light: 'ApplicationClass_16x',
+        dark: 'ApplicationClass_16x'
     };
 
     //-------------
 
-    static readonly cppConfigName = 'keil';
+    vscodeDir: File;
+    uvprjFile: File;
+    logger: Console;
 
     protected _event: event.EventEmitter;
-    protected uvprjFile: File;
-    protected vscodeDir: File;
     protected watcher: FileWatcher;
-
-    protected fGroups: FileGroup[];
-    protected includes: Set<string>;
-    protected defines: Set<string>;
-
-    protected logger: Console;
+    protected targetList: Target[];
 
     constructor(_uvprjFile: File) {
         this._event = new event.EventEmitter();
+        this.targetList = [];
         this.vscodeDir = new File(_uvprjFile.dir + File.sep + '.vscode');
         this.vscodeDir.CreateDir();
-        this.logger = new console.Console(fs.createWriteStream(
-            this.vscodeDir.path + File.sep + 'keil-assistant.log', { flags: 'a+' }));
+        const logPath = this.vscodeDir.path + File.sep + 'keil-assistant.log';
+        this.logger = new console.Console(fs.createWriteStream(logPath, { flags: 'a+' }));
         this.uvprjFile = _uvprjFile;
         this.watcher = new FileWatcher(this.uvprjFile);
         this.prjID = getMD5(_uvprjFile.path);
         this.label = _uvprjFile.noSuffixName;
         this.tooltip = _uvprjFile.path;
-        this.includes = new Set();
-        this.defines = new Set();
-        this.fGroups = [];
         this.logger.log('Log at : ' + Time.GetInstance().GetTimeStamp() + '\r\n');
+        this.watcher.OnChanged = () => this.reload();
+        this.watcher.Watch();
     }
 
     on(event: 'dataChanged', listener: () => void): void;
@@ -226,21 +237,115 @@ abstract class Project implements IView {
         this._event.on(event, listener);
     }
 
-    static async getInstance(uvprjFile: File): Promise<Project> {
-        let prj: Project;
-        if (uvprjFile.suffix.toLowerCase() === '.uvproj') {
-            prj = new C51project(uvprjFile);
+    private reload() {
+        this.targetList.forEach((target) => target.close());
+        this.targetList = [];
+        this.load();
+        this._event.emit('dataChanged');
+    }
+
+    async load() {
+
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const doc = await parser.parseStringPromise({ toString: () => { return this.uvprjFile.Read(); } });
+        const targets = doc['Project']['Targets']['Target'];
+
+        if (isArray(targets)) {
+            for (const target of targets) {
+                this.targetList.push(Target.getInstance(this, target));
+            }
         } else {
-            prj = new ArmProject(uvprjFile);
+            this.targetList.push(Target.getInstance(this, targets));
         }
-        return prj;
+
+        for (const target of this.targetList) {
+            try {
+                await target.load();
+                target.on('dataChanged', () => this._event.emit('dataChanged'));
+            } catch (error) {
+                this.logger.log(error);
+            }
+        }
+    }
+
+    close() {
+        this.watcher.Close();
+        this.targetList.forEach((target) => target.close());
+        this.logger.log('[Project Close]: ' + this.label);
+    }
+
+    toAbsolutePath(rePath: string): string {
+        const path = rePath.replace(/\//g, File.sep);
+        if (/^[a-z]:/i.test(path)) {
+            return node_path.normalize(path);
+        }
+        return node_path.normalize(this.uvprjFile.dir + File.sep + path);
+    }
+
+    getChildViews(): IView[] | undefined {
+        return this.targetList;
+    }
+
+    getTargets(): Target[] {
+        return this.targetList;
+    }
+}
+
+abstract class Target implements IView {
+
+    prjID: string;
+    label: string;
+    tooltip?: string | undefined;
+    contextVal?: string | undefined = 'Target';
+    icons?: { light: string; dark: string; } = {
+        light: 'Class_16x',
+        dark: 'Class_16x'
+    };
+
+    //-------------
+
+    readonly targetName: string;
+
+    protected _event: event.EventEmitter;
+    protected project: KeilProjectInfo;
+    protected cppConfigName: string;
+    protected targetDOM: any;
+    protected fGroups: FileGroup[];
+    protected includes: Set<string>;
+    protected defines: Set<string>;
+
+    constructor(prjInfo: KeilProjectInfo, targetDOM: any) {
+        this._event = new event.EventEmitter();
+        this.project = prjInfo;
+        this.targetDOM = targetDOM;
+        this.prjID = prjInfo.prjID;
+        this.targetName = targetDOM['TargetName'];
+        this.label = this.targetName;
+        this.tooltip = this.targetName;
+        this.cppConfigName = this.targetName;
+        this.includes = new Set();
+        this.defines = new Set();
+        this.fGroups = [];
+    }
+
+    on(event: 'dataChanged', listener: () => void): void;
+    on(event: any, listener: () => void): void {
+        this._event.on(event, listener);
+    }
+
+    static getInstance(prjInfo: KeilProjectInfo, targetDOM: any): Target {
+        if (prjInfo.uvprjFile.suffix.toLowerCase() === '.uvproj') {
+            return new C51Target(prjInfo, targetDOM);
+        } else {
+            return new ArmTarget(prjInfo, targetDOM);
+        }
     }
 
     private getDefCppProperties(): any {
         return {
             configurations: [
                 {
-                    name: Project.cppConfigName,
+                    name: this.cppConfigName,
                     includePath: undefined,
                     defines: undefined,
                     intelliSenseMode: '${default}'
@@ -252,14 +357,14 @@ abstract class Project implements IView {
 
     private updateCppProperties() {
 
-        const proFile = new File(this.vscodeDir.path + File.sep + 'c_cpp_properties.json');
+        const proFile = new File(this.project.vscodeDir.path + File.sep + 'c_cpp_properties.json');
         let obj: any;
 
         if (proFile.IsFile()) {
             try {
                 obj = JSON.parse(proFile.Read());
             } catch (error) {
-                console.warn(error);
+                this.project.logger.log(error);
                 obj = this.getDefCppProperties();
             }
         } else {
@@ -267,11 +372,11 @@ abstract class Project implements IView {
         }
 
         const configList: any[] = obj['configurations'];
-        const index = configList.findIndex((conf) => { return conf.name === Project.cppConfigName; });
+        const index = configList.findIndex((conf) => { return conf.name === this.cppConfigName; });
 
         if (index === -1) {
             configList.push({
-                name: Project.cppConfigName,
+                name: this.cppConfigName,
                 includePath: Array.from(this.includes),
                 defines: Array.from(this.defines),
                 intelliSenseMode: '${default}'
@@ -284,15 +389,12 @@ abstract class Project implements IView {
         proFile.Write(JSON.stringify(obj, undefined, 4));
     }
 
-    async reload(): Promise<void> {
+    async load(): Promise<void> {
 
-        const parser = new xml2js.Parser({ explicitArray: false });
-        const doc = await parser.parseStringPromise({ toString: () => { return this.uvprjFile.Read(); } });
-
-        const incListStr: string = this.getIncString(doc['Project']);
-        const defineListStr: string = this.getDefineString(doc['Project']);
-        const _groups: any = this.getGroups(doc['Project']);
-        const sysIncludes = this.getSystemIncludes(doc['Project']);
+        const incListStr: string = this.getIncString(this.targetDOM);
+        const defineListStr: string = this.getDefineString(this.targetDOM);
+        const _groups: any = this.getGroups(this.targetDOM);
+        const sysIncludes = this.getSystemIncludes(this.targetDOM);
 
         // set includes
         this.includes.clear();
@@ -305,20 +407,23 @@ abstract class Project implements IView {
         incList.forEach((path) => {
             const realPath = path.trim();
             if (realPath !== '') {
-                this.includes.add(this.toAbsolutePath(realPath));
+                this.includes.add(this.project.toAbsolutePath(realPath));
             }
         });
 
         // set defines
         this.defines.clear();
 
-        // add system defines
-        this.getSysDefines().forEach((define) => { this.defines.add(define); });
-
+        // add user macros
         defineListStr.split(/,|\s+/).forEach((define) => {
             if (define.trim() !== '') {
                 this.defines.add(define);
             }
+        });
+
+        // add system macros
+        this.getSysDefines(this.targetDOM).forEach((define) => {
+            this.defines.add(define);
         });
 
         // set file groups
@@ -347,7 +452,7 @@ abstract class Project implements IView {
                 }
 
                 for (const file of files) {
-                    const f = new File(this.toAbsolutePath(file['FilePath']));
+                    const f = new File(this.project.toAbsolutePath(file['FilePath']));
                     // check file is enable
                     let enable = true;
                     if (file['FileOption']) {
@@ -369,18 +474,6 @@ abstract class Project implements IView {
         this._event.emit('dataChanged');
     }
 
-    async init() {
-        await this.reload();
-        this.watcher.Watch();
-        this.watcher.OnChanged = () => {
-            try {
-                this.reload();
-            } catch (error) {
-                this.logger.warn(error);
-            }
-        };
-    }
-
     private quoteString(str: string, quote: string = '"'): string {
         return str.includes(' ') ? (quote + str + quote) : str;
     }
@@ -389,10 +482,9 @@ abstract class Project implements IView {
 
         const resManager = ResourceManager.getInstance();
         let args: string[] = [];
-        const uv4Log = new File(this.vscodeDir.path + File.sep + 'uv4.log');
 
-        args.push('-o');
-        args.push(uv4Log.path);
+        const uv4LogFile = new File(this.project.vscodeDir.path + File.sep + 'uv4.log');
+        args.push('-o', uv4LogFile.path);
         args = args.concat(commands);
 
         const isCmd = /cmd.exe$/i.test(vscode.env.shell);
@@ -447,28 +539,17 @@ abstract class Project implements IView {
     }
 
     close() {
-        this.watcher.Close();
-        this.logger.log('---- project closed ----\r\n');
-    }
-
-    toAbsolutePath(rePath: string): string {
-        const path = rePath.replace(/\//g, File.sep);
-        if (/^[a-z]:/i.test(path)) {
-            return node_path.normalize(path);
-        }
-        return node_path.normalize(this.uvprjFile.dir + File.sep + path);
     }
 
     getChildViews(): IView[] | undefined {
         return this.fGroups;
     }
 
-    protected abstract getIncString(keilDoc: any): string;
-    protected abstract getDefineString(keilDoc: any): string;
-    protected abstract getSysDefines(): string[];
-    protected abstract getGroups(keilDoc: any): any[];
-
-    protected abstract getSystemIncludes(keilDoc: any): string[] | undefined;
+    protected abstract getIncString(target: any): string;
+    protected abstract getDefineString(target: any): string;
+    protected abstract getSysDefines(target: any): string[];
+    protected abstract getGroups(target: any): any[];
+    protected abstract getSystemIncludes(target: any): string[] | undefined;
 
     protected abstract getProblemMatcher(): string[];
     protected abstract getBuildCommand(): string[];
@@ -478,9 +559,9 @@ abstract class Project implements IView {
 
 //===============================================
 
-class C51project extends Project {
+class C51Target extends Target {
 
-    protected getSysDefines(): string[] {
+    protected getSysDefines(target: any): string[] {
         return [
             '__C51__',
             '__VSCODE_C51__',
@@ -507,7 +588,7 @@ class C51project extends Project {
         ];
     }
 
-    protected getSystemIncludes(keilDoc: any): string[] | undefined {
+    protected getSystemIncludes(target: any): string[] | undefined {
         const exeFile = new File(ResourceManager.getInstance().getC51UV4Path());
         if (exeFile.IsFile()) {
             return [
@@ -517,18 +598,18 @@ class C51project extends Project {
         return undefined;
     }
 
-    protected getIncString(keilDoc: any): string {
-        const target51 = keilDoc['Targets']['Target']['TargetOption']['Target51']['C51'];
+    protected getIncString(target: any): string {
+        const target51 = target['TargetOption']['Target51']['C51'];
         return target51['VariousControls']['IncludePath'];
     }
 
-    protected getDefineString(keilDoc: any): string {
-        const target51 = keilDoc['Targets']['Target']['TargetOption']['Target51']['C51'];
+    protected getDefineString(target: any): string {
+        const target51 = target['TargetOption']['Target51']['C51'];
         return target51['VariousControls']['Define'];
     }
 
-    protected getGroups(keilDoc: any): any[] {
-        return keilDoc['Targets']['Target']['Groups']['Group'] || [];
+    protected getGroups(target: any): any[] {
+        return target['Groups']['Group'] || [];
     }
 
     protected getProblemMatcher(): string[] {
@@ -536,109 +617,206 @@ class C51project extends Project {
     }
 
     protected getBuildCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getC51UV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -b ${prjPath} -j0');
-        return cmds;
-    }
-
-    protected getRebuildCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getC51UV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -r ${prjPath} -j0 -z');
-        return cmds;
-    }
-
-    protected getDownloadCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getC51UV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -f ${prjPath} -j0');
-        return cmds;
-    }
-}
-
-class ArmProject extends Project {
-
-    protected getSysDefines(): string[] {
         return [
-            '__CC_ARM',
-            '__arm__',
-            '__align(x)=',
-            '__ALIGNOF__(x)=',
-            '__alignof__(x)=',
-            '__asm(x)=',
-            '__forceinline=',
-            "__restrict=",
-            '__global_reg(n)=',
-            '__inline=',
-            '__int64=long long',
-            '__INTADDR(expr)=',
-            '__irq=',
-            '__packed=',
-            '__pure=',
-            '__smc(n)=',
-            '__svc(n)=',
-            '__svc_indirect(n)=',
-            '__svc_indirect_r7(n)=',
-            '__value_in_regs=',
-            '__weak=',
-            '__writeonly=',
-            '__declspec(x)=',
-            '__attribute__(x)=',
-            '__nonnull__(x)=',
-            '__register=',
-    
-            "__enable_fiq()=",
-            "__disable_fiq()=",
-    
-            "__nop()=",
-            "__wfi()=",
-            "__wfe()=",
-            "__sev()=",
-            
-            "__isb(x)=",
-            "__dsb(x)=",
-            "__dmb(x)=",
-            "__schedule_barrier()=",
-            
-            "__rev(x)=0U",
-    
-            "__ror(x,y)=0U",
-            "__breakpoint(x)=",
-            "__clz(x)=0U",
-            "__ldrex(x)=0U",
-            "__strex(x,y)=0U",
-            "__clrex()=",
-            "__ssat(x,y)=0U",
-            "__usat(x,y)=0U",
-    
-            "__ldrt(x)=0U",
-            "__strt(x,y)="
+            '--uv4Path', ResourceManager.getInstance().getC51UV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -b ${prjPath} -j0 -t ${targetName}'
         ];
     }
 
-    protected getSystemIncludes(keilDoc: any): string[] | undefined {
+    protected getRebuildCommand(): string[] {
+        return [
+            '--uv4Path', ResourceManager.getInstance().getC51UV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -r ${prjPath} -j0 -z -t ${targetName}'
+        ];
+    }
+
+    protected getDownloadCommand(): string[] {
+        return [
+            '--uv4Path', ResourceManager.getInstance().getC51UV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -f ${prjPath} -j0 -t ${targetName}'
+        ];
+    }
+}
+
+class MacroHandler {
+
+    private regMatchers = {
+        'normal_macro': /^#define (\w+) (.*)$/,
+        'func_macro': /^#define (\w+\([^\)]*\)) (.*)$/
+    };
+
+    toExpression(macro: string): string | undefined {
+
+        let mList = this.regMatchers['normal_macro'].exec(macro);
+        if (mList && mList.length > 2) {
+            return `${mList[1]}=${mList[2]}`;
+        }
+
+        mList = this.regMatchers['func_macro'].exec(macro);
+        if (mList && mList.length > 2) {
+            return `${mList[1]}=`;
+        }
+    }
+}
+
+class ArmTarget extends Target {
+
+    private static readonly armccMacros: string[] = [
+        '__CC_ARM',
+        '__arm__',
+        '__align(x)=',
+        '__ALIGNOF__(x)=',
+        '__alignof__(x)=',
+        '__asm(x)=',
+        '__forceinline=',
+        "__restrict=",
+        '__global_reg(n)=',
+        '__inline=',
+        '__int64=long long',
+        '__INTADDR(expr)=',
+        '__irq=',
+        '__packed=',
+        '__pure=',
+        '__smc(n)=',
+        '__svc(n)=',
+        '__svc_indirect(n)=',
+        '__svc_indirect_r7(n)=',
+        '__value_in_regs=',
+        '__weak=',
+        '__writeonly=',
+        '__declspec(x)=',
+        '__attribute__(x)=',
+        '__nonnull__(x)=',
+        '__register=',
+
+        "__enable_fiq()=",
+        "__disable_fiq()=",
+
+        "__nop()=",
+        "__wfi()=",
+        "__wfe()=",
+        "__sev()=",
+
+        "__isb(x)=",
+        "__dsb(x)=",
+        "__dmb(x)=",
+        "__schedule_barrier()=",
+
+        "__rev(x)=0U",
+
+        "__ror(x,y)=0U",
+        "__breakpoint(x)=",
+        "__clz(x)=0U",
+        "__ldrex(x)=0U",
+        "__strex(x,y)=0U",
+        "__clrex()=",
+        "__ssat(x,y)=0U",
+        "__usat(x,y)=0U",
+
+        "__ldrt(x)=0U",
+        "__strt(x,y)="
+    ];
+
+    private static armclangMacros: string[] = [
+        '__alignof__(x)=',
+        '__unaligned=',
+        '__forceinline=',
+        '__restrict=',
+        '__volatile__=',
+        '__inline=',
+        '__inline__=',
+        '__asm(x)=',
+        '__asm__(x)=',
+        '__declspec(x)=',
+        '__attribute__(x)=',
+        '__nonnull__(x)=',
+        '__irq=',
+        '__swi=',
+        '__weak=',
+        '__register=',
+        '__pure=',
+        '__value_in_regs=',
+
+        '__builtin_arm_nop()=',
+        '__builtin_arm_wfi()=',
+        '__builtin_arm_wfe()=',
+        '__builtin_arm_sev()=',
+        '__builtin_arm_sevl()=',
+        '__builtin_arm_yield()=',
+        '__builtin_arm_isb(x)=',
+        '__builtin_arm_dsb(x)=',
+        '__builtin_arm_dmb(x)=',
+
+        '__builtin_bswap32(x)=0U',
+        '__builtin_bswap16(x)=0U',
+        '__builtin_arm_rbit(x)=0U',
+
+        '__builtin_clz(x)=0U',
+        '__builtin_arm_ldrex(x)=0U',
+        '__builtin_arm_strex(x,y)=0U',
+        '__builtin_arm_clrex()=',
+        '__builtin_arm_ssat(x,y)=0U',
+        '__builtin_arm_usat(x,y)=0U',
+        '__builtin_arm_ldaex(x)=0U',
+        '__builtin_arm_stlex(x,y)=0U'
+    ];
+
+    private static armclangBuildinMacros: string[] | undefined;
+
+    constructor(prjInfo: KeilProjectInfo, targetDOM: any) {
+        super(prjInfo, targetDOM);
+        ArmTarget.initArmclangMacros();
+    }
+
+    private static initArmclangMacros() {
+        if (ArmTarget.armclangBuildinMacros === undefined) {
+            const armClangPath = node_path.dirname(node_path.dirname(ResourceManager.getInstance().getArmUV4Path()))
+                + File.sep + 'ARM' + File.sep + 'ARMCLANG' + File.sep + 'bin' + File.sep + 'armclang.exe';
+            ArmTarget.armclangBuildinMacros = ArmTarget.getArmClangMacroList(armClangPath);
+        }
+    }
+
+    protected getSysDefines(target: any): string[] {
+        if (target['uAC6'] === '1') { // ARMClang
+            return ArmTarget.armclangMacros.concat(ArmTarget.armclangBuildinMacros || []);
+        } else { // ARMCC
+            return ArmTarget.armccMacros;
+        }
+    }
+
+    private static getArmClangMacroList(armClangPath: string): string[] {
+        try {
+            const cmdLine = CmdLineHandler.quoteString(armClangPath, '"')
+                + ' ' + ['--target=arm-arm-none-eabi', '-E', '-dM', '-', '<nul'].join(' ');
+
+            const lines = child_process.execSync(cmdLine).toString().split(/\r\n|\n/);
+            const resList: string[] = [];
+            const mHandler = new MacroHandler();
+
+            lines.filter((line) => { return line.trim() !== ''; })
+                .forEach((line) => {
+                    const value = mHandler.toExpression(line);
+                    if (value) {
+                        resList.push(value);
+                    }
+                });
+
+            return resList;
+        } catch (error) {
+            return ['__GNUC__=4', '__GNUC_MINOR__=2', '__GNUC_PATCHLEVEL__=1'];
+        }
+    }
+
+    protected getSystemIncludes(target: any): string[] | undefined {
         const exeFile = new File(ResourceManager.getInstance().getArmUV4Path());
         if (exeFile.IsFile()) {
-            const toolName = 'ARMCC'; // keilDoc['Targets']['Target']['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
+            const toolName = target['uAC6'] === '1' ? 'ARMCLANG' : 'ARMCC';
             const incDir = new File(`${node_path.dirname(exeFile.dir)}${File.sep}ARM${File.sep}${toolName}${File.sep}include`);
             if (incDir.IsDir()) {
                 return [incDir.path].concat(
@@ -649,61 +827,49 @@ class ArmProject extends Project {
         return undefined;
     }
 
-    protected getIncString(keilDoc: any): string {
-        const dat = keilDoc['Targets']['Target']['TargetOption']['TargetArmAds']['Cads'];
+    protected getIncString(target: any): string {
+        const dat = target['TargetOption']['TargetArmAds']['Cads'];
         return dat['VariousControls']['IncludePath'];
     }
 
-    protected getDefineString(keilDoc: any): string {
-        const dat = keilDoc['Targets']['Target']['TargetOption']['TargetArmAds']['Cads'];
+    protected getDefineString(target: any): string {
+        const dat = target['TargetOption']['TargetArmAds']['Cads'];
         return dat['VariousControls']['Define'];
     }
 
-    protected getGroups(keilDoc: any): any[] {
-        return keilDoc['Targets']['Target']['Groups']['Group'] || [];
+    protected getGroups(target: any): any[] {
+        return target['Groups']['Group'] || [];
     }
 
     protected getProblemMatcher(): string[] {
-        return ['$armcc'];
+        return ['$armcc', '$gcc'];
     }
 
     protected getBuildCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getArmUV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -b ${prjPath} -j0');
-        return cmds;
+        return [
+            '--uv4Path', ResourceManager.getInstance().getArmUV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -b ${prjPath} -j0 -t ${targetName}'
+        ];
     }
 
     protected getRebuildCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getArmUV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -r ${prjPath} -j0 -z');
-        return cmds;
+        return [
+            '--uv4Path', ResourceManager.getInstance().getArmUV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -r ${prjPath} -j0 -z -t ${targetName}'
+        ];
     }
 
     protected getDownloadCommand(): string[] {
-        const cmds: string[] = [];
-        cmds.push('-e');
-        cmds.push(ResourceManager.getInstance().getArmUV4Path());
-
-        cmds.push('-u');
-        cmds.push(this.uvprjFile.path);
-
-        cmds.push('-c');
-        cmds.push('${uv4Path} -f ${prjPath} -j0');
-        return cmds;
+        return [
+            '--uv4Path', ResourceManager.getInstance().getArmUV4Path(),
+            '--prjPath', this.project.uvprjFile.path,
+            '--targetName', this.targetName,
+            '-c', '${uv4Path} -f ${prjPath} -j0 -t ${targetName}'
+        ];
     }
 }
 
@@ -716,8 +882,8 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     onDidChangeTreeData: vscode.Event<IView>;
     private viewEvent: vscode.EventEmitter<IView>;
 
-    private prjList: Map<string, Project>;
-    private activePrj: Project | undefined;
+    private prjList: Map<string, KeilProject>;
+    private activePrj: KeilProject | undefined;
 
     constructor(context: vscode.ExtensionContext) {
         this.prjList = new Map();
@@ -747,10 +913,10 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
 
     async openProject(path: string) {
 
-        const nPrj = await Project.getInstance(new File(path));
+        const nPrj = new KeilProject(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
 
-            nPrj.init();
+            await nPrj.load();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
             this.updateView();
@@ -767,16 +933,31 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
             prj.close();
             this.prjList.delete(pID);
             this.updateView();
+
+            if (prj.prjID === this.activePrj?.prjID) {
+                for (const prj of this.prjList.values()) {
+                    this.activePrj = prj;
+                }
+            }
         }
     }
 
-    getProject(view: IView): Project | undefined {
+    getTarget(view: IView): Target | undefined {
 
-        if (view) {
-            return this.prjList.get(view.prjID);
+        const prj = this.prjList.get(view.prjID);
+
+        if (view && prj) {
+            const targets = prj.getTargets();
+            const index = targets.findIndex((target) => { return target.targetName === view.label; });
+            if (index !== -1) {
+                return targets[index];
+            }
         }
 
-        return this.activePrj;
+        if (this.activePrj) {
+            const targets = this.activePrj.getTargets();
+            return targets.length > 0 ? targets[0] : undefined;
+        }
     }
 
     updateView() {

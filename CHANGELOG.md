@@ -2,6 +2,11 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.4.0]
+- New: support multi-target keil project
+- New: add armclang cpp macros
+***
+
 ## [v1.3.3]
 - Optimize: extend more armcc keywords
 ***
