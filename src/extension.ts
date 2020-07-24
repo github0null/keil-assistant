@@ -441,17 +441,30 @@ abstract class Target implements IView {
             if (group['Files'] !== undefined) {
                 const nGrp = new FileGroup(this.prjID, group['GroupName']);
 
-                let files: any[];
-                if (Array.isArray(group['Files']['File'])) {
-                    files = group['Files']['File'];
-                }
-                else if (group['Files']['File'] !== undefined) {
-                    files = [group['Files']['File']];
+                let fileList: any[];
+
+                if (Array.isArray(group['Files'])) {
+                    fileList = [];
+                    for (const files of group['Files']) {
+                        if (Array.isArray(files['File'])) {
+                            fileList = fileList.concat(files['File']);
+                        }
+                        else if (files['File'] !== undefined) {
+                            fileList.push(files['File']);
+                        }
+                    }
                 } else {
-                    files = [];
+                    if (Array.isArray(group['Files']['File'])) {
+                        fileList = group['Files']['File'];
+                    }
+                    else if (group['Files']['File'] !== undefined) {
+                        fileList = [group['Files']['File']];
+                    } else {
+                        fileList = [];
+                    }
                 }
 
-                for (const file of files) {
+                for (const file of fileList) {
                     const f = new File(this.project.toAbsolutePath(file['FilePath']));
                     // check file is enable
                     let enable = true;
