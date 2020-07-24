@@ -896,7 +896,6 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     private viewEvent: vscode.EventEmitter<IView>;
 
     private prjList: Map<string, KeilProject>;
-    private activePrj: KeilProject | undefined;
 
     constructor(context: vscode.ExtensionContext) {
         this.prjList = new Map();
@@ -925,18 +924,12 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     }
 
     async openProject(path: string) {
-
         const nPrj = new KeilProject(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
-
             await nPrj.load();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
             this.updateView();
-
-            if (this.activePrj === undefined) {
-                this.activePrj = nPrj;
-            }
         }
     }
 
@@ -946,30 +939,19 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
             prj.close();
             this.prjList.delete(pID);
             this.updateView();
-
-            if (prj.prjID === this.activePrj?.prjID) {
-                for (const prj of this.prjList.values()) {
-                    this.activePrj = prj;
-                }
-            }
         }
     }
 
-    getTarget(view: IView): Target | undefined {
-
-        const prj = this.prjList.get(view.prjID);
-
-        if (view && prj) {
-            const targets = prj.getTargets();
-            const index = targets.findIndex((target) => { return target.targetName === view.label; });
-            if (index !== -1) {
-                return targets[index];
+    getTarget(view?: IView): Target | undefined {
+        if (view) {
+            const prj = this.prjList.get(view.prjID);
+            if (prj) {
+                const targets = prj.getTargets();
+                const index = targets.findIndex((target) => { return target.targetName === view.label; });
+                if (index !== -1) {
+                    return targets[index];
+                }
             }
-        }
-
-        if (this.activePrj) {
-            const targets = this.activePrj.getTargets();
-            return targets.length > 0 ? targets[0] : undefined;
         }
     }
 

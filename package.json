@@ -107,20 +107,6 @@
                 }
             }
         ],
-        "keybindings": [
-            {
-                "command": "project.build",
-                "key": "f6"
-            },
-            {
-                "command": "project.rebuild",
-                "key": "f7"
-            },
-            {
-                "command": "project.download",
-                "key": "f9"
-            }
-        ],
         "menus": {
             "view/title": [
                 {
