@@ -51,6 +51,10 @@ vscode 上的 Keil 辅助工具，与 c/c++ 插件配合使用，为 Keil 项目
 
 ![cpp_config](./res/preview/cpp_config.png)
 
+5. 右键菜单点击 Active Target 将快捷键绑定到该 Keil Target 上
+
+![active_target](./res/preview/active_target.png)
+
 ***
 
 ## 工作特性 🎉

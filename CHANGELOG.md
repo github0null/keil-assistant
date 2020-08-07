@@ -2,6 +2,11 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.5.0]
+- New: add 'Active Target' button
+- Changed: adjust keybindings
+***
+
 ## [v1.4.0]
 - New: support multi-target keil project
 - New: add armclang cpp macros

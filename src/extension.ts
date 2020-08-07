@@ -63,6 +63,8 @@ export function activate(context: vscode.ExtensionContext) {
 
     subscriber.push(vscode.commands.registerCommand('item.copyValue', (item: IView) => vscode.env.clipboard.writeText(item.tooltip || '')));
 
+    subscriber.push(vscode.commands.registerCommand('project.active', (item: IView) => prjExplorer.setActiveTargetByView(item)));
+
     prjExplorer.loadWorkspace();
 }
 
@@ -896,6 +898,7 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     private viewEvent: vscode.EventEmitter<IView>;
 
     private prjList: Map<string, KeilProject>;
+    private currentActiveTarget: Target | undefined;
 
     constructor(context: vscode.ExtensionContext) {
         this.prjList = new Map();
@@ -914,7 +917,10 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
                 const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER);
                 for (const uvFile of uvList) {
                     try {
-                        await this.openProject(uvFile.path);
+                        const prj = await this.openProject(uvFile.path);
+                        if (this.currentActiveTarget === undefined && prj && prj.getTargets().length > 0) { // init first active target
+                            this.setActiveTarget(prj.getTargets()[0]);
+                        }
                     } catch (error) {
                         vscode.window.showErrorMessage(`load project: '${uvFile.name}' failed !, msg: ${(<Error>error).message}`);
                     }
@@ -923,13 +929,14 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
         }
     }
 
-    async openProject(path: string) {
+    async openProject(path: string): Promise<KeilProject | undefined> {
         const nPrj = new KeilProject(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
             await nPrj.load();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
             this.updateView();
+            return nPrj;
         }
     }
 
@@ -938,7 +945,40 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
         if (prj) {
             prj.close();
             this.prjList.delete(pID);
+            this.clearActiveTargetByPrj(prj);
             this.updateView();
+        }
+    }
+
+    setActiveTargetByView(view: IView) {
+        const prj = this.prjList.get(view.prjID);
+        if (prj) {
+            const tList = prj.getTargets();
+            const tIndex = tList.findIndex((target) => { return target.label === view.label; });
+            if (tIndex !== -1) {
+                this.setActiveTarget(tList[tIndex]);
+            }
+        }
+    }
+
+    setActiveTarget(target: Target) {
+        this.resetActiveTarget();
+        this.currentActiveTarget = target;
+        this.currentActiveTarget.icons = { light: 'ClassProtected_16x', dark: 'ClassProtected_16x' };
+        this.updateView();
+    }
+
+    resetActiveTarget() {
+        if (this.currentActiveTarget) {
+            this.currentActiveTarget.icons = { light: 'Class_16x', dark: 'Class_16x' };
+            this.currentActiveTarget = undefined;
+        }
+    }
+
+    clearActiveTargetByPrj(prj: KeilProject) {
+        if (this.currentActiveTarget && this.currentActiveTarget.prjID === prj.prjID) {
+            this.currentActiveTarget.icons = { light: 'Class_16x', dark: 'Class_16x' };
+            this.currentActiveTarget = undefined;
         }
     }
 
@@ -951,6 +991,12 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
                 if (index !== -1) {
                     return targets[index];
                 }
+            }
+        } else { // get active target
+            if (this.currentActiveTarget) {
+                return this.currentActiveTarget;
+            } else {
+                vscode.window.showWarningMessage('Not found any active target !');
             }
         }
     }
