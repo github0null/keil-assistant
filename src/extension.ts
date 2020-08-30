@@ -113,9 +113,13 @@ class Source implements IView {
 
     //---
     readonly file: File;
+    readonly enable: boolean;
+
+    children: Source[] | undefined;
 
     constructor(pID: string, f: File, _enable: boolean = true) {
         this.prjID = pID;
+        this.enable = _enable;
         this.file = f;
         this.label = this.file.name;
         this.tooltip = f.path;
@@ -153,7 +157,7 @@ class Source implements IView {
     }
 
     getChildViews(): IView[] | undefined {
-        return undefined;
+        return this.children;
     }
 }
 
@@ -316,6 +320,9 @@ abstract class Target implements IView {
     protected includes: Set<string>;
     protected defines: Set<string>;
 
+    private uv4LogFile: File;
+    private uv4LogLockFileWatcher: FileWatcher;
+
     constructor(prjInfo: KeilProjectInfo, targetDOM: any) {
         this._event = new event.EventEmitter();
         this.project = prjInfo;
@@ -328,6 +335,25 @@ abstract class Target implements IView {
         this.includes = new Set();
         this.defines = new Set();
         this.fGroups = [];
+        this.uv4LogFile = new File(this.project.vscodeDir.path + File.sep + 'uv4.log');
+        this.uv4LogLockFileWatcher = new FileWatcher(new File(this.uv4LogFile.path + '.lock'));
+
+        if (!this.uv4LogLockFileWatcher.file.IsFile()) { // create file if not existed
+            this.uv4LogLockFileWatcher.file.Write('');
+        }
+
+        this.uv4LogLockFileWatcher.Watch();
+        this.uv4LogLockFileWatcher.OnChanged = () => this.updateSourceRefs();
+        this.uv4LogLockFileWatcher.on('error', () => {
+
+            this.uv4LogLockFileWatcher.Close();
+
+            if (!this.uv4LogLockFileWatcher.file.IsFile()) { // create file if not existed
+                this.uv4LogLockFileWatcher.file.Write('');
+            }
+
+            this.uv4LogLockFileWatcher.Watch();
+        });
     }
 
     on(event: 'dataChanged', listener: () => void): void;
@@ -486,6 +512,8 @@ abstract class Target implements IView {
 
         this.updateCppProperties();
 
+        this.updateSourceRefs();
+
         this._event.emit('dataChanged');
     }
 
@@ -498,8 +526,7 @@ abstract class Target implements IView {
         const resManager = ResourceManager.getInstance();
         let args: string[] = [];
 
-        const uv4LogFile = new File(this.project.vscodeDir.path + File.sep + 'uv4.log');
-        args.push('-o', uv4LogFile.path);
+        args.push('-o', this.uv4LogFile.path);
         args = args.concat(commands);
 
         const isCmd = /cmd.exe$/i.test(vscode.env.shell);
@@ -553,7 +580,30 @@ abstract class Target implements IView {
         this.runTask('download', this.getDownloadCommand());
     }
 
+    updateSourceRefs() {
+        const rePath = this.getOutputFolder(this.targetDOM);
+        if (rePath) {
+            const outPath = this.project.toAbsolutePath(rePath);
+            this.fGroups.forEach((group) => {
+                group.sources.forEach((source) => {
+                    if (source.enable) { // if source not disabled
+                        const refFile = File.fromArray([outPath, source.file.noSuffixName + '.d']);
+                        if (refFile.IsFile()) {
+                            const refFileList = this.parseRefLines(this.targetDOM, refFile.Read().split(/\r\n|\n/))
+                                .map((rePath) => { return this.project.toAbsolutePath(rePath); });
+                            source.children = refFileList.map((refFilePath) => {
+                                return new Source(source.prjID, new File(refFilePath));
+                            });
+                        }
+                    }
+                });
+            });
+            this._event.emit('dataChanged');
+        }
+    }
+
     close() {
+        this.uv4LogLockFileWatcher.Close();
     }
 
     getChildViews(): IView[] | undefined {
@@ -566,6 +616,9 @@ abstract class Target implements IView {
     protected abstract getGroups(target: any): any[];
     protected abstract getSystemIncludes(target: any): string[] | undefined;
 
+    protected abstract getOutputFolder(target: any): string | undefined;
+    protected abstract parseRefLines(target: any, lines: string[]): string[];
+
     protected abstract getProblemMatcher(): string[];
     protected abstract getBuildCommand(): string[];
     protected abstract getRebuildCommand(): string[];
@@ -575,6 +628,14 @@ abstract class Target implements IView {
 //===============================================
 
 class C51Target extends Target {
+
+    protected parseRefLines(target: any, lines: string[]): string[] {
+        return [];
+    }
+
+    protected getOutputFolder(target: any): string | undefined {
+        return undefined;
+    }
 
     protected getSysDefines(target: any): string[] {
         return [
@@ -789,6 +850,65 @@ class ArmTarget extends Target {
         ArmTarget.initArmclangMacros();
     }
 
+    protected getOutputFolder(target: any): string | undefined {
+        try {
+            return <string>target['TargetOption']['TargetCommonOption']['OutputDirectory'];
+        } catch (error) {
+            return undefined;
+        }
+    }
+
+    private gnu_parseRefLines(lines: string[]): string[] {
+
+        const resultList: Set<string> = new Set();
+
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+            let _line = lines[lineIndex];
+
+            let line = _line[_line.length - 1] === '\\' ? _line.substring(0, _line.length - 1) : _line; // remove char '\'
+            let subLines = line.trim().split(/(?<![\\:]) /);
+
+            if (lineIndex === 0) // first line
+            {
+                for (let i = 1; i < subLines.length; i++) // skip first sub line
+                {
+                    resultList.add(subLines[i].trim().replace(/\\ /g, " "));
+                }
+            }
+            else  // other lines, first char is whitespace
+            {
+                subLines.forEach((item) => {
+                    resultList.add(item.trim().replace(/\\ /g, " "));
+                });
+            }
+        }
+
+        return Array.from(resultList);
+    }
+
+    private ac5_parseRefLines(lines: string[], startIndex: number = 1): string[] {
+
+        const resultList: Set<string> = new Set<string>();
+
+        for (let i = startIndex; i < lines.length; i++) {
+            let sepIndex = lines[i].indexOf(": ");
+            if (sepIndex > 0) {
+                const line: string = lines[i].substring(sepIndex + 1).trim();
+                resultList.add(line);
+            }
+        }
+
+        return Array.from(resultList);
+    }
+
+    protected parseRefLines(target: any, lines: string[]): string[] {
+        if (target['uAC6'] === '1') { // ARMClang
+            return this.gnu_parseRefLines(lines);
+        } else { // ARMCC
+            return this.ac5_parseRefLines(lines);
+        }
+    }
+
     private static initArmclangMacros() {
         if (ArmTarget.armclangBuildinMacros === undefined) {
             const armClangPath = node_path.dirname(node_path.dirname(ResourceManager.getInstance().getArmUV4Path()))
@@ -892,6 +1012,8 @@ class ArmTarget extends Target {
 
 class ProjectExplorer implements vscode.TreeDataProvider<IView> {
 
+    static readonly prjIgnoreFileName: string = 'prj.ignore';
+
     private ItemClickCommand: string = 'Item.Click';
 
     onDidChangeTreeData: vscode.Event<IView>;
@@ -914,7 +1036,9 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
                 node_path.dirname(vscode.workspace.workspaceFile.fsPath) : vscode.workspace.workspaceFolders[0].uri.fsPath;
             const workspace = new File(wsFilePath);
             if (workspace.IsDir()) {
-                const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER);
+                const excludeList = ResourceManager.getInstance().getProjectExcludeList();
+                const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER)
+                    .filter((file) => { return !excludeList.includes(file.name); });
                 for (const uvFile of uvList) {
                     try {
                         const prj = await this.openProject(uvFile.path);

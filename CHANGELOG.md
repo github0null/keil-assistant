@@ -2,6 +2,11 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.6.0]
+- New: support show source referance files
+- New: add exclude list on open multi-project workspace
+***
+
 ## [v1.5.0]
 - New: add 'Active Target' button
 - Changed: adjust keybindings

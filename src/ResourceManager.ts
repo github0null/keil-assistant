@@ -66,6 +66,10 @@ export class ResourceManager {
     getArmUV4Path(): string {
         return this.getAppConfig().get<string>('MDK.Uv4Path') || 'null';
     }
+    
+    getProjectExcludeList(): string[] {
+        return this.getAppConfig().get<string[]>('Project.ExcludeList') || [];
+    }
 
     getIconByName(name: string): string | undefined {
         return this.iconMap.get(name);

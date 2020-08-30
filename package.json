@@ -2,7 +2,7 @@
     "name": "keil-assistant",
     "displayName": "Keil Assistant",
     "description": "An assistant for Keil uVision",
-    "version": "1.5.0",
+    "version": "1.6.0",
     "publisher": "cl",
     "author": {
         "name": "cl",
@@ -53,6 +53,15 @@
                         "scope": "machine",
                         "markdownDescription": "MDK UV4.exe path",
                         "default": "null"
+                    },
+                    "KeilAssistant.Project.ExcludeList": {
+                        "type": "array",
+                        "scope": "resource",
+                        "markdownDescription": "uVision project file name exclude list",
+                        "default": [
+                            "template.uvproj",
+                            "template.uvprojx"
+                        ]
                     }
                 }
             }
