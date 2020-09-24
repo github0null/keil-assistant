@@ -994,7 +994,7 @@ class ArmTarget extends Target {
             '--uv4Path', ResourceManager.getInstance().getArmUV4Path(),
             '--prjPath', this.project.uvprjFile.path,
             '--targetName', this.targetName,
-            '-c', '${uv4Path} -r ${prjPath} -j0 -z -t ${targetName}'
+            '-c', '${uv4Path} -r ${prjPath} -j0 -t ${targetName}'
         ];
     }
 
