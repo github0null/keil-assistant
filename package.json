@@ -2,7 +2,7 @@
     "name": "keil-assistant",
     "displayName": "Keil Assistant",
     "description": "An assistant for Keil uVision",
-    "version": "1.6.0",
+    "version": "1.6.1",
     "publisher": "cl",
     "author": {
         "name": "cl",

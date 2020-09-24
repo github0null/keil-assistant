@@ -706,7 +706,7 @@ class C51Target extends Target {
             '--uv4Path', ResourceManager.getInstance().getC51UV4Path(),
             '--prjPath', this.project.uvprjFile.path,
             '--targetName', this.targetName,
-            '-c', '${uv4Path} -r ${prjPath} -j0 -z -t ${targetName}'
+            '-c', '${uv4Path} -r ${prjPath} -j0 -t ${targetName}'
         ];
     }
 
