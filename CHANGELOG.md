@@ -2,6 +2,11 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.6.2]
+- Fixed: output messy code
+- Optimize: extend more armcc keywords
+***
+
 ## [v1.6.1]
 - Fixed: error rebuild command
 ***
