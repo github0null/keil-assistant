@@ -2,7 +2,7 @@
     "name": "keil-assistant",
     "displayName": "Keil Assistant",
     "description": "An assistant for Keil uVision",
-    "version": "1.6.2",
+    "version": "1.7.0",
     "publisher": "cl",
     "author": {
         "name": "cl",
@@ -76,8 +76,12 @@
                 }
             },
             {
-                "command": "project.active",
-                "title": "Active Target"
+                "command": "project.switch",
+                "title": "Switch Target",
+                "icon": {
+                    "light": "./res/icons/SwitchSourceOrTarget_16x.svg",
+                    "dark": "./res/icons/SwitchSourceOrTarget_16x.svg"
+                }
             },
             {
                 "command": "project.close",
@@ -134,8 +138,9 @@
                     "when": "viewItem == Project"
                 },
                 {
-                    "command": "project.active",
-                    "when": "viewItem == Target"
+                    "command": "project.switch",
+                    "group": "inline",
+                    "when": "viewItem == Project"
                 },
                 {
                     "command": "project.build",
@@ -159,7 +164,7 @@
                 }
             ]
         },
-        "keybindings":[
+        "keybindings": [
             {
                 "command": "project.build",
                 "key": "f7"
