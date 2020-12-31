@@ -5,6 +5,7 @@ import * as event from 'events';
 import * as fs from 'fs';
 import * as node_path from 'path';
 import * as child_process from 'child_process';
+import * as os from 'os'
 
 import { File } from '../lib/node-utility/File';
 import { ResourceManager } from './ResourceManager';
@@ -208,6 +209,10 @@ interface KeilProjectInfo {
     toAbsolutePath(rePath: string): string;
 }
 
+interface uVisonInfo {
+    schemaVersion: string | undefined;
+}
+
 class KeilProject implements IView, KeilProjectInfo {
 
     prjID: string;
@@ -225,7 +230,11 @@ class KeilProject implements IView, KeilProjectInfo {
     uvprjFile: File;
     logger: Console;
 
+    // uVison info
+    uVsionFileInfo: uVisonInfo;
+
     private activeTarget: Target | undefined;
+    private prevUpdateTime: number | undefined;
 
     protected _event: event.EventEmitter;
     protected watcher: FileWatcher;
@@ -233,6 +242,7 @@ class KeilProject implements IView, KeilProjectInfo {
 
     constructor(_uvprjFile: File) {
         this._event = new event.EventEmitter();
+        this.uVsionFileInfo = <uVisonInfo>{};
         this.targetList = [];
         this.vscodeDir = new File(_uvprjFile.dir + File.sep + '.vscode');
         this.vscodeDir.CreateDir();
@@ -243,8 +253,14 @@ class KeilProject implements IView, KeilProjectInfo {
         this.prjID = getMD5(_uvprjFile.path);
         this.label = _uvprjFile.noSuffixName;
         this.tooltip = _uvprjFile.path;
-        this.logger.log('Log at : ' + Time.GetInstance().GetTimeStamp() + '\r\n');
-        this.watcher.OnChanged = () => { try { this.reload(); } catch (err) { vscode.window.showErrorMessage(`reload project failed !, msg: ${err.message}`); } };
+        this.logger.log('[info] Log at : ' + Time.GetInstance().GetTimeStamp() + '\r\n');
+        this.watcher.OnChanged = () => {
+            if (this.prevUpdateTime === undefined ||
+                this.prevUpdateTime + 2000 < Date.now()) {
+                this.prevUpdateTime = Date.now(); // reset update time
+                setTimeout(() => this.onReload(), 500)
+            }
+        };
         this.watcher.Watch();
     }
 
@@ -253,43 +269,53 @@ class KeilProject implements IView, KeilProjectInfo {
         this._event.on(event, listener);
     }
 
-    private async reload() {
-        this.targetList.forEach((target) => target.close());
-        this.targetList = [];
-        const err = await this.load();
-        if (err) throw err;
-        this._event.emit('dataChanged');
+    private async onReload() {
+        try {
+            this.targetList.forEach((target) => target.close());
+            this.targetList = [];
+            await this.load();
+            this.notifyUpdateView();
+        } catch (err) {
+            if (err.code && err.code === 'EBUSY') {
+                this.logger.log(`[Warn] uVision project file '${this.uvprjFile.name}' is locked !, delay 800 ms and retry !`);
+                setTimeout(() => this.onReload(), 500);
+            } else {
+                vscode.window.showErrorMessage(`reload project failed !, msg: ${err.message}`);
+            }
+        }
     }
 
-    async load(): Promise<Error | undefined> {
-        try {
-            const parser = new xml2js.Parser({ explicitArray: false });
-            const doc = await parser.parseStringPromise({ toString: () => { return this.uvprjFile.Read(); } });
-            const targets = doc['Project']['Targets']['Target'];
+    async load() {
 
-            if (isArray(targets)) {
-                for (const target of targets) {
-                    this.targetList.push(Target.getInstance(this, target));
-                }
-            } else {
-                this.targetList.push(Target.getInstance(this, targets));
-            }
+        const parser = new xml2js.Parser({ explicitArray: false });
+        const doc = await parser.parseStringPromise({ toString: () => { return this.uvprjFile.Read(); } });
+        const targets = doc['Project']['Targets']['Target'];
 
-            for (const target of this.targetList) {
-                await target.load();
-                target.on('dataChanged', () => this._event.emit('dataChanged'));
+        // init uVsion info
+        this.uVsionFileInfo.schemaVersion = doc['Project']['SchemaVersion'];
+
+        if (isArray(targets)) {
+            for (const target of targets) {
+                this.targetList.push(Target.getInstance(this, this.uVsionFileInfo, target));
             }
-            return undefined; // done
-        } catch (error) {
-            this.logger.log(error);
-            return error;
+        } else {
+            this.targetList.push(Target.getInstance(this, this.uVsionFileInfo, targets));
         }
+
+        for (const target of this.targetList) {
+            await target.load();
+            target.on('dataChanged', () => this.notifyUpdateView());
+        }
+    }
+
+    notifyUpdateView() {
+        this._event.emit('dataChanged');
     }
 
     close() {
         this.watcher.Close();
         this.targetList.forEach((target) => target.close());
-        this.logger.log('[Project Close]: ' + this.label);
+        this.logger.log('[info] project closed: ' + this.label);
     }
 
     toAbsolutePath(rePath: string): string {
@@ -304,7 +330,7 @@ class KeilProject implements IView, KeilProjectInfo {
         const index = this.targetList.findIndex((t) => { return t.targetName === tName; });
         if (index !== -1) {
             this.activeTarget = this.targetList[index];
-            this._event.emit('dataChanged'); // notify data changed
+            this.notifyUpdateView(); // notify data changed
         }
     }
 
@@ -345,6 +371,7 @@ abstract class Target implements IView {
     protected project: KeilProjectInfo;
     protected cppConfigName: string;
     protected targetDOM: any;
+    protected uvInfo: uVisonInfo;
     protected fGroups: FileGroup[];
     protected includes: Set<string>;
     protected defines: Set<string>;
@@ -352,10 +379,11 @@ abstract class Target implements IView {
     private uv4LogFile: File;
     private uv4LogLockFileWatcher: FileWatcher;
 
-    constructor(prjInfo: KeilProjectInfo, targetDOM: any) {
+    constructor(prjInfo: KeilProjectInfo, uvInfo: uVisonInfo, targetDOM: any) {
         this._event = new event.EventEmitter();
         this.project = prjInfo;
         this.targetDOM = targetDOM;
+        this.uvInfo = uvInfo;
         this.prjID = prjInfo.prjID;
         this.targetName = targetDOM['TargetName'];
         this.label = this.targetName;
@@ -390,11 +418,11 @@ abstract class Target implements IView {
         this._event.on(event, listener);
     }
 
-    static getInstance(prjInfo: KeilProjectInfo, targetDOM: any): Target {
+    static getInstance(prjInfo: KeilProjectInfo, uvInfo: uVisonInfo, targetDOM: any): Target {
         if (prjInfo.uvprjFile.suffix.toLowerCase() === '.uvproj') {
-            return new C51Target(prjInfo, targetDOM);
+            return new C51Target(prjInfo, uvInfo, targetDOM);
         } else {
-            return new ArmTarget(prjInfo, targetDOM);
+            return new ArmTarget(prjInfo, uvInfo, targetDOM);
         }
     }
 
@@ -447,6 +475,10 @@ abstract class Target implements IView {
     }
 
     async load(): Promise<void> {
+
+        // check target is valid
+        const err = this.checkProject(this.targetDOM);
+        if (err) throw err;
 
         const incListStr: string = this.getIncString(this.targetDOM);
         const defineListStr: string = this.getDefineString(this.targetDOM);
@@ -553,8 +585,6 @@ abstract class Target implements IView {
         this.updateCppProperties();
 
         this.updateSourceRefs();
-
-        this._event.emit('dataChanged');
     }
 
     private quoteString(str: string, quote: string = '"'): string {
@@ -650,6 +680,8 @@ abstract class Target implements IView {
         return this.fGroups;
     }
 
+    protected abstract checkProject(target: any): Error | undefined;
+
     protected abstract getIncString(target: any): string;
     protected abstract getDefineString(target: any): string;
     protected abstract getSysDefines(target: any): string[];
@@ -668,6 +700,13 @@ abstract class Target implements IView {
 //===============================================
 
 class C51Target extends Target {
+
+    protected checkProject(target: any): Error | undefined {
+        if (target['TargetOption']['Target51'] === undefined ||
+            target['TargetOption']['Target51']['C51'] === undefined) {
+            return new Error(`This uVision project is not a C51 project, but have a 'uvproj' suffix !`)
+        }
+    }
 
     protected parseRefLines(target: any, lines: string[]): string[] {
         return [];
@@ -919,9 +958,13 @@ class ArmTarget extends Target {
 
     private static armclangBuildinMacros: string[] | undefined;
 
-    constructor(prjInfo: KeilProjectInfo, targetDOM: any) {
-        super(prjInfo, targetDOM);
+    constructor(prjInfo: KeilProjectInfo, uvInfo: uVisonInfo, targetDOM: any) {
+        super(prjInfo, uvInfo, targetDOM);
         ArmTarget.initArmclangMacros();
+    }
+
+    protected checkProject(): Error | undefined {
+        return undefined;
     }
 
     protected getOutputFolder(target: any): string | undefined {
@@ -1125,8 +1168,7 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     async openProject(path: string): Promise<KeilProject | undefined> {
         const nPrj = new KeilProject(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
-            const err = await nPrj.load();
-            if (err) throw err;
+            await nPrj.load();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
             this.updateView();

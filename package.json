@@ -84,6 +84,14 @@
                 }
             },
             {
+                "command": "project.refresh",
+                "title": "Refresh",
+                "icon":{
+                    "light": "./res/icons/refresh-light.svg",
+                    "dark": "./res/icons/refresh-dark.svg"
+                }
+            },
+            {
                 "command": "project.close",
                 "title": "Close Project",
                 "icon": {
@@ -135,6 +143,11 @@
             "view/item/context": [
                 {
                     "command": "project.close",
+                    "when": "viewItem == Project"
+                },
+                {
+                    "command": "project.refresh",
+                    "group": "inline",
                     "when": "viewItem == Project"
                 },
                 {

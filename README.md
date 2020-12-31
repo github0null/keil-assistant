@@ -24,7 +24,6 @@ vscode 上的 Keil 辅助工具，与 c/c++ 插件配合使用.
 - 自动感知 keil 项目文件的变化，及时更新项目视图
 - 通过调用 Keil 命令行接口实现 编译，重新编译，烧录 keil 项目
 - 自动生成 c_cpp_properties.json 文件，使 C/C++ 插件的语法分析能正常进行
-- 自动生成 Cortex-Debug 的调试配置 (C51项目除外)
 
 ***
 
@@ -52,7 +51,7 @@ vscode 上的 Keil 辅助工具，与 c/c++ 插件配合使用.
 4. 点击目标名称在多个 c/c++ 配置中切换
  ![cpp_config](./res/preview/cpp_config.png)
 
-5. 右键菜单点击 Active Target 将快捷键绑定到该 Keil Target 上
+5. 点击项目的切换按钮，可以在多个 Keil Target 之间切换
  ![active_target](./res/preview/active_target.png)
 
 6. 在编译完成后，可以点击源文件项的箭头图标展开其引用（仅支持 MDK 项目）
