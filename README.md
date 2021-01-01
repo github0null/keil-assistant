@@ -34,6 +34,7 @@ vscode 上的 Keil 辅助工具，与 c/c++ 插件配合使用.
 1. 安装 C/C++ 插件
 >
 2. 进入 Keil-Assistant 插件设置，设置好 keil 可执行文件 UV4.exe 的绝对路径
+ 
  ![setting](./res/preview/setting.png)
 
 ***
@@ -43,36 +44,43 @@ vscode 上的 Keil 辅助工具，与 c/c++ 插件配合使用.
 1. 在 Keil 上创建好项目，添加好文件，头文件路径等
 > 
 2. 点击 **打开项目** 图标 或者 **使用 vscode 直接打开 keil 项目文件(.uvproj) 所在的目录**，插件会自动加载 keil 项目；
+ 
  ![load](./res/preview/load.png)
 
 ### 常用操作
 
 - **编译，烧录**：提供了 3 个按钮，分别代表 编译，下载，重新编译
+ 
  ![build](./res/preview/build.png)
 
 >
 
 - **保存和刷新**：在 Keil 上添加/删除源文件，更改，配置项目，更改完毕后点击 **保存所有**，插件检测到 keil 项目变化后会自动刷新项目
+ 
  ![keil_save_all](./res/preview/keil_save_all.png)
 
 >
 
 - **打开源文件**：单击源文件将以预览模式打开，双击源文件将切换到非预览模式打开
+ 
  ![open_file](./res/preview/open_file.png)
 
 >
 
 - **切换 c/c++ 插件的配置**：点击目标名称在多个 c/c++ 配置中切换
+ 
  ![cpp_config](./res/preview/cpp_config.png)
 
 >
 
 - **切换 keil Target**：点击项目的切换按钮，可以在多个 Keil Target 之间切换
+ 
  ![active_target](./res/preview/active_target.png)
 
 >
 
 - **展开引用**：在编译完成后，可以点击源文件项的箭头图标展开其引用（仅支持 ARM 项目）
+ 
  ![show_referance](./res/preview/ref_show.png)
 
 ***

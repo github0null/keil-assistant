@@ -32,6 +32,7 @@ It provides syntax highlighting, code snippets for Keil projects, and supports c
 1. Install the C/C++ plug-in
 >
 2. Go to the Keil-Assistant plug-in Settings and set the absolute path of the Keil executable uv4.exe
+ 
  ![setting](./res/preview/setting.png)
 
 ***
@@ -41,36 +42,43 @@ It provides syntax highlighting, code snippets for Keil projects, and supports c
 1. Create a project on Keil, add files, header path, etc
 > 
 2. Click **Open the Project** icon or **Use Vscode to directly open the directory where keil project file (.uvproj) is located**, and the keil project will be automatically loaded by the plug-in;
+ 
  ![load](./res/preview/load.png)
 
 ### Common operations
 
 - **Compile and burn**：Three buttons are provided, one for compile, one for download, and one for recompile
+ 
  ![build](./res/preview/build.png)
 
 >
 
 - **Save and refresh**：Add/delete the source file, change and configure the project on Keil. Click **Save all** when the change is finished. The plug-in will automatically refresh the project when it detects the change of the Keil project
+ 
  ![keil_save_all](./res/preview/keil_save_all.png)
 
 >
 
 - **Open source file**：Clicking the source file will open it in preview mode, and double-clicking the source file will switch it to non-preview mode
+ 
  ![open_file](./res/preview/open_file.png)
 
 >
 
 - **Toggle the C/C++ plug-in configuration**：Click the target name to toggle between multiple C/C++ configurations
+ 
  ![cpp_config](./res/preview/cpp_config.png)
 
 >
 
 - **Switch keil Target**：Click the project toggle button to toggle between multiple Keil targets
+ 
  ![active_target](./res/preview/active_target.png)
 
 >
 
 - **Show reference**：After compilation is complete, you can expand the reference by clicking on the arrow icon for the source item (ARM project only)
+ 
  ![show_referance](./res/preview/ref_show.png)
 
 ***
