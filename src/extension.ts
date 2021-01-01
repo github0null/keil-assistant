@@ -5,7 +5,6 @@ import * as event from 'events';
 import * as fs from 'fs';
 import * as node_path from 'path';
 import * as child_process from 'child_process';
-import * as os from 'os'
 
 import { File } from '../lib/node-utility/File';
 import { ResourceManager } from './ResourceManager';
@@ -233,7 +232,7 @@ class KeilProject implements IView, KeilProjectInfo {
     // uVison info
     uVsionFileInfo: uVisonInfo;
 
-    private activeTarget: Target | undefined;
+    private activeTargetName: string | undefined;
     private prevUpdateTime: number | undefined;
 
     protected _event: event.EventEmitter;
@@ -258,7 +257,7 @@ class KeilProject implements IView, KeilProjectInfo {
             if (this.prevUpdateTime === undefined ||
                 this.prevUpdateTime + 2000 < Date.now()) {
                 this.prevUpdateTime = Date.now(); // reset update time
-                setTimeout(() => this.onReload(), 500)
+                setTimeout(() => this.onReload(), 300);
             }
         };
         this.watcher.Watch();
@@ -277,7 +276,7 @@ class KeilProject implements IView, KeilProjectInfo {
             this.notifyUpdateView();
         } catch (err) {
             if (err.code && err.code === 'EBUSY') {
-                this.logger.log(`[Warn] uVision project file '${this.uvprjFile.name}' is locked !, delay 800 ms and retry !`);
+                this.logger.log(`[Warn] uVision project file '${this.uvprjFile.name}' is locked !, delay 500 ms and retry !`);
                 setTimeout(() => this.onReload(), 500);
             } else {
                 vscode.window.showErrorMessage(`reload project failed !, msg: ${err.message}`);
@@ -326,18 +325,27 @@ class KeilProject implements IView, KeilProjectInfo {
         return node_path.normalize(this.uvprjFile.dir + File.sep + path);
     }
 
-    setActiveTarget(tName: string) {
-        const index = this.targetList.findIndex((t) => { return t.targetName === tName; });
+    getTargetByName(name: string): Target | undefined {
+        const index = this.targetList.findIndex((t) => { return t.targetName === name; });
         if (index !== -1) {
-            this.activeTarget = this.targetList[index];
+            return this.targetList[index];
+        }
+    }
+
+    setActiveTarget(tName: string) {
+        if (tName !== this.activeTargetName) {
+            this.activeTargetName = tName;
             this.notifyUpdateView(); // notify data changed
         }
     }
 
     getChildViews(): IView[] | undefined {
 
-        if (this.activeTarget) {
-            return [this.activeTarget];
+        if (this.activeTargetName) {
+            const target = this.getTargetByName(this.activeTargetName);
+            if (target) {
+                return [target];
+            }
         }
 
         if (this.targetList.length > 0) {
@@ -478,7 +486,7 @@ abstract class Target implements IView {
 
         // check target is valid
         const err = this.checkProject(this.targetDOM);
-        if (err) throw err;
+        if (err) { throw err; }
 
         const incListStr: string = this.getIncString(this.targetDOM);
         const defineListStr: string = this.getDefineString(this.targetDOM);
@@ -704,7 +712,7 @@ class C51Target extends Target {
     protected checkProject(target: any): Error | undefined {
         if (target['TargetOption']['Target51'] === undefined ||
             target['TargetOption']['Target51']['C51'] === undefined) {
-            return new Error(`This uVision project is not a C51 project, but have a 'uvproj' suffix !`)
+            return new Error(`This uVision project is not a C51 project, but have a 'uvproj' suffix !`);
         }
     }
 
