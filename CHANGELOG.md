@@ -2,6 +2,12 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.7.0]
+- Change: adjust view
+- Optimize: Update doc
+- Optimize: support double click to open file with non-preview mode
+***
+
 ## [v1.6.2]
 - Fixed: output messy code
 - Optimize: extend more armcc keywords
