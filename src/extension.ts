@@ -5,6 +5,7 @@ import * as event from 'events';
 import * as fs from 'fs';
 import * as node_path from 'path';
 import * as child_process from 'child_process';
+import * as vscodeVariables from 'vscode-variables';
 
 import { File } from '../lib/node_utility/File';
 import { ResourceManager } from './ResourceManager';
@@ -491,12 +492,12 @@ abstract class Target implements IView {
         if (index === -1) {
             configList.push({
                 name: this.cppConfigName,
-                includePath: Array.from(this.includes),
+                includePath: Array.from(this.includes).concat(['${default}']),
                 defines: Array.from(this.defines),
                 intelliSenseMode: '${default}'
             });
         } else {
-            configList[index]['includePath'] = Array.from(this.includes);
+            configList[index]['includePath'] = Array.from(this.includes).concat(['${default}']);
             configList[index]['defines'] = Array.from(this.defines);
         }
 
@@ -1181,11 +1182,11 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
             const workspace = new File(wsFilePath);
             if (workspace.IsDir()) {
                 const excludeList = ResourceManager.getInstance().getProjectExcludeList();
-                const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER)
+                const uvList = workspace.GetList([/\.uvproj[x]?$/i], File.EMPTY_FILTER).concat(ResourceManager.getInstance().getProjectFileLocationList())
                     .filter((file) => { return !excludeList.includes(file.name); });
                 for (const uvFile of uvList) {
                     try {
-                        await this.openProject(uvFile.path);
+                        await this.openProject(vscodeVariables(uvFile));
                     } catch (error) {
                         vscode.window.showErrorMessage(`open project: '${uvFile.name}' failed !, msg: ${(<Error>error).message}`);
                     }

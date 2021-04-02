@@ -71,6 +71,10 @@ export class ResourceManager {
         return this.getAppConfig().get<string[]>('Project.ExcludeList') || [];
     }
 
+    getProjectFileLocationList(): string[] {
+        return this.getAppConfig().get<string[]>('Project.FileLocationList') || [];
+    }
+
     getIconByName(name: string): string | undefined {
         return this.iconMap.get(name);
     }
