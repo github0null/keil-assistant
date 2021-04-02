@@ -6,10 +6,10 @@ import * as fs from 'fs';
 import * as node_path from 'path';
 import * as child_process from 'child_process';
 
-import { File } from '../lib/node-utility/File';
+import { File } from '../lib/node_utility/File';
 import { ResourceManager } from './ResourceManager';
-import { FileWatcher } from '../lib/node-utility/FileWatcher';
-import { Time } from '../lib/node-utility/Time';
+import { FileWatcher } from '../lib/node_utility/FileWatcher';
+import { Time } from '../lib/node_utility/Time';
 import { isArray } from 'util';
 import { CmdLineHandler } from './CmdLineHandler';
 
@@ -64,6 +64,8 @@ export function activate(context: vscode.ExtensionContext) {
     subscriber.push(vscode.commands.registerCommand('item.copyValue', (item: IView) => vscode.env.clipboard.writeText(item.tooltip || '')));
 
     subscriber.push(vscode.commands.registerCommand('project.switch', (item: IView) => prjExplorer.switchTargetByProject(item)));
+    
+    subscriber.push(vscode.commands.registerCommand('project.active', (item: IView) => prjExplorer.activeProject(item)));
 
     prjExplorer.loadWorkspace();
 }
@@ -219,8 +221,8 @@ class KeilProject implements IView, KeilProjectInfo {
     tooltip?: string | undefined;
     contextVal?: string | undefined = 'Project';
     icons?: { light: string; dark: string; } = {
-        light: 'ApplicationClass_16x',
-        dark: 'ApplicationClass_16x'
+        light: 'DeactiveApplication_16x',
+        dark: 'DeactiveApplication_16x'
     };
 
     //-------------
@@ -325,6 +327,14 @@ class KeilProject implements IView, KeilProjectInfo {
         return node_path.normalize(this.uvprjFile.dir + File.sep + path);
     }
 
+    active() {
+        this.icons = { light: 'ActiveApplication_16x', dark: 'ActiveApplication_16x' };
+    }
+
+    deactive() {
+        this.icons = { light: 'DeactiveApplication_16x', dark: 'DeactiveApplication_16x' };
+    }
+
     getTargetByName(name: string): Target | undefined {
         const index = this.targetList.findIndex((t) => { return t.targetName === name; });
         if (index !== -1) {
@@ -336,6 +346,17 @@ class KeilProject implements IView, KeilProjectInfo {
         if (tName !== this.activeTargetName) {
             this.activeTargetName = tName;
             this.notifyUpdateView(); // notify data changed
+        }
+    }
+
+    getActiveTarget(): Target | undefined {
+
+        if (this.activeTargetName) {
+            return this.getTargetByName(this.activeTargetName);
+        }
+
+        else if (this.targetList.length > 0) {
+            return this.targetList[0];
         }
     }
 
@@ -1143,7 +1164,7 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     private viewEvent: vscode.EventEmitter<IView>;
 
     private prjList: Map<string, KeilProject>;
-    private currentActiveTarget: Target | undefined;
+    private currentActiveProject: KeilProject | undefined;
 
     constructor(context: vscode.ExtensionContext) {
         this.prjList = new Map();
@@ -1174,12 +1195,21 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     }
 
     async openProject(path: string): Promise<KeilProject | undefined> {
+
         const nPrj = new KeilProject(new File(path));
         if (!this.prjList.has(nPrj.prjID)) {
+
             await nPrj.load();
             nPrj.on('dataChanged', () => this.updateView());
             this.prjList.set(nPrj.prjID, nPrj);
+
+            if (this.currentActiveProject == undefined) {
+                this.currentActiveProject = nPrj;
+                this.currentActiveProject.active();
+            }
+
             this.updateView();
+
             return nPrj;
         }
     }
@@ -1187,9 +1217,19 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
     async closeProject(pID: string) {
         const prj = this.prjList.get(pID);
         if (prj) {
+            prj.deactive();
             prj.close();
             this.prjList.delete(pID);
-            this.clearActiveTargetByPrj(prj);
+            this.updateView();
+        }
+    }
+
+    async activeProject(view: IView) {
+        const project = this.prjList.get(view.prjID);
+        if (project) {
+            this.currentActiveProject?.deactive();
+            this.currentActiveProject = project;
+            this.currentActiveProject?.active();
             this.updateView();
         }
     }
@@ -1208,13 +1248,6 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
         }
     }
 
-    clearActiveTargetByPrj(prj: KeilProject) {
-        if (this.currentActiveTarget && this.currentActiveTarget.prjID === prj.prjID) {
-            this.currentActiveTarget.icons = { light: 'Class_16x', dark: 'Class_16x' };
-            this.currentActiveTarget = undefined;
-        }
-    }
-
     getTarget(view?: IView): Target | undefined {
         if (view) {
             const prj = this.prjList.get(view.prjID);
@@ -1226,10 +1259,10 @@ class ProjectExplorer implements vscode.TreeDataProvider<IView> {
                 }
             }
         } else { // get active target
-            if (this.currentActiveTarget) {
-                return this.currentActiveTarget;
+            if (this.currentActiveProject) {
+                return this.currentActiveProject.getActiveTarget();
             } else {
-                vscode.window.showWarningMessage('Not found any active target !');
+                vscode.window.showWarningMessage('Not found any active project !');
             }
         }
     }

@@ -2,6 +2,10 @@
 
 All notable changes to the "keil-assistant" extension will be documented in this file.
 
+## [v1.7.1]
+- Fixed: can't use shortcut key
+***
+
 ## [v1.7.0]
 - Change: adjust view
 - Optimize: Update doc
