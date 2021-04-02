@@ -1,5 +1,4 @@
 test.js
-.vscodeignore
 out
 out.min
 node_modules
