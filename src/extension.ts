@@ -491,12 +491,12 @@ abstract class Target implements IView {
         if (index === -1) {
             configList.push({
                 name: this.cppConfigName,
-                includePath: Array.from(this.includes),
+                includePath: Array.from(this.includes).concat(['${default}']),
                 defines: Array.from(this.defines),
                 intelliSenseMode: '${default}'
             });
         } else {
-            configList[index]['includePath'] = Array.from(this.includes);
+            configList[index]['includePath'] = Array.from(this.includes).concat(['${default}']);
             configList[index]['defines'] = Array.from(this.defines);
         }
 
