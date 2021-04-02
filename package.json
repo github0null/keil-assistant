@@ -62,6 +62,12 @@
                             "template.uvproj",
                             "template.uvprojx"
                         ]
+                    },
+                    "KeilAssistant.Project.FileLocationList": {
+                        "type": "array",
+                        "scope": "resource",
+                        "markdownDescription": "uVision project file locations",
+                        "default": []
                     }
                 }
             }
@@ -297,6 +303,8 @@
         "webpack-cli": "^3.3.11"
     },
     "dependencies": {
+        "@types/vscode": "^1.38.0",
+        "vscode-variables": "^0.1.3",
         "xml2js": "^0.4.23"
     }
 }
